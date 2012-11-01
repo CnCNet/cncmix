@@ -15,8 +15,9 @@ rotsum a b = a + (b `rotateL` 1)
 stringTOfilename :: [Char] -> [Word32]
 stringTOfilename [] = []
 stringTOfilename a
-  | length a>4  = (s2f1 1 a) : (stringTOfilename ((tail . tail . tail . tail) a))
   | length a<=4 = (s2f1 1 a) : []
+  | length a>4  = (s2f1 1 a) : (stringTOfilename ((tail . tail . tail . tail) a))
+
 
 s2f1 :: Int -> [Char] -> Word32
 s2f1 5 xs  = 0
@@ -27,5 +28,5 @@ s2f1 k xs
 
 charTOasciiword32 :: Char -> Word32
 charTOasciiword32 c 
-  | isAscii c = fromIntegral $ fromEnum c
+  | isAscii c = fromIntegral $ fromEnum $ toUpper c
   | otherwise = error "non-ascii"
