@@ -5,30 +5,27 @@ import Data.Int
 import Data.Bits
 import Data.Char
 
+import System.FilePath
+import qualified Data.ByteString.Lazy as L
+
 
 --
 -- Datatypes
 --
 
-
-import Data.ByteString.Lazy (ByteString)
-import Data.Int (Int64)
-
-newtype MixArchive = MixArchive { mix :: MixArchive2 }
-  deriving Show
+data File = File { name :: String, contents :: L.ByteString }
 
 -- | A Command & Conquer MIX archive.
-data MixArchive2 = MixArchive2
+data MixArchive = MixArchive
     {
       -- | most importantly, gives filecount
       masterHeader :: MixHeader,
       -- | length and offset for each file
       entryHeaders :: [MixEntry],
       -- | the files themselves
-      entryData :: [ByteString]
+      entryData :: [L.ByteString]
     }
   deriving Show
-
 
 -- | The Master header for a Mix
 data MixHeader = MixHeader
@@ -83,3 +80,26 @@ charTOasciiword32 :: Char -> Word32
 charTOasciiword32 c 
   | isAscii c = fromIntegral $ fromEnum $ toUpper c
   | otherwise = error "non-ascii"
+
+makeID = (filenameTOid . stringTOfilename)
+
+--
+-- Create MIX
+--
+
+-- | Creates a TAR archive containing a number of files
+createMixArchive :: [File] -- ^ Filename + Bytestring pairs to include
+                    -> MixArchive
+createMixArchive x = MixArchive (makeMaster x) (makeIndex x) (map contents x)
+
+makeMaster x =  MixHeader (fromIntegral $ length x) (foldl (+) 0 (map (fromIntegral . L.length . contents) x))
+
+makeIndex :: [File] -> [MixEntry]
+makeIndex = makeIndexReal 0
+
+makeIndexReal :: Int32 -> [File] -> [MixEntry]
+makeIndexReal a [] = []
+makeIndexReal a b  = (MixEntry (makeID $ name c) a len) : makeIndexReal (a+len) (tail b)
+  where
+    c = head b
+    len = fromIntegral $  L.length $ contents c
