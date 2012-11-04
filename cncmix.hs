@@ -8,6 +8,10 @@ import Data.Char
 import System.FilePath
 import qualified Data.ByteString.Lazy as L
 
+import Data.Binary
+import Data.Binary.Get
+import Data.Binary.Put
+import Control.Monad
 
 --
 -- Datatypes
@@ -16,19 +20,19 @@ import qualified Data.ByteString.Lazy as L
 data File = File { name :: String, contents :: L.ByteString }
 
 -- | A Command & Conquer MIX archive.
-data MixArchive = MixArchive
+data Mix = Mix
     {
       -- | most importantly, gives filecount
-      masterHeader :: MixHeader,
-      -- | length and offset for each file
-      entryHeaders :: [MixEntry],
-      -- | the files themselves
+      masterHeader :: TopHeader,
+      -- | length and offset for each file, IN REVERSE ORDER
+      entryHeaders :: [EntryHeader],
+      -- | the files themselves, IN REVERSE ORDER
       entryData :: [L.ByteString]
     }
   deriving Show
 
 -- | The Master header for a Mix
-data MixHeader = MixHeader
+data TopHeader = TopHeader
     {
       -- | number of internal files
       numFiles :: Int16,
@@ -38,7 +42,7 @@ data MixHeader = MixHeader
   deriving Show
 
 -- | A MIX archive entry for a file
-data MixEntry = MixEntry
+data EntryHeader = EntryHeader
     {
       -- | id, used to identify the file instead of a normal name
       id :: Word32,
@@ -88,18 +92,18 @@ makeID = (filenameTOid . stringTOfilename)
 --
 
 -- | Creates a TAR archive containing a number of files
-createMixArchive :: [File] -- ^ Filename + Bytestring pairs to include
-                    -> MixArchive
-createMixArchive x = MixArchive (makeMaster x) (makeIndex x) (map contents x)
+createMix :: [File] -- ^ Filename + Bytestring pairs to include
+                    -> Mix
+createMix x = Mix (makeMaster x) (makeIndex x) (map contents x)
 
-makeMaster x =  MixHeader (fromIntegral $ length x) (foldl (+) 0 (map (fromIntegral . L.length . contents) x))
+makeMaster x =  TopHeader (fromIntegral $ length x) (foldl (+) 0 (map (fromIntegral . L.length . contents) x))
 
-makeIndex :: [File] -> [MixEntry]
+makeIndex :: [File] -> [EntryHeader]
 makeIndex = makeIndexReal 0
 
-makeIndexReal :: Int32 -> [File] -> [MixEntry]
+makeIndexReal :: Int32 -> [File] -> [EntryHeader]
 makeIndexReal a [] = []
-makeIndexReal a b  = (MixEntry (makeID $ name c) a len) : makeIndexReal (a+len) (tail b)
+makeIndexReal a b  = (EntryHeader (makeID $ name c) a len) : makeIndexReal (a+len) (tail b)
   where
     c = head b
     len = fromIntegral $  L.length $ contents c
@@ -109,9 +113,34 @@ makeIndexReal a b  = (MixEntry (makeID $ name c) a len) : makeIndexReal (a+len) 
 --
 
 --
--- Read Mix
+-- Read/Write Mix
 --
 
---
--- Write Mix
---
+instance Binary TopHeader where
+  get = do a <- getWord16le
+           b <- getWord32le
+           return (TopHeader (fromIntegral a) (fromIntegral b))
+
+  put (TopHeader a b) = do putWord16le $ fromIntegral b
+                           putWord32le $ fromIntegral a
+
+
+instance Binary EntryHeader where
+  get = do a <- getWord32le
+           b <- getWord32le
+           c <- getWord32le
+           return (EntryHeader (fromIntegral a) (fromIntegral b) (fromIntegral c))
+
+  put (EntryHeader a b c) = do putWord16le $ fromIntegral c
+                               putWord32le $ fromIntegral b
+                               putWord32le $ fromIntegral a
+
+
+instance Binary Mix where
+       get = do top <- get
+                entries <- replicateM (fromIntegral $ numFiles top) get
+                files <- mapM getLazyByteString $ map (fromIntegral .  size) entries
+                return (Mix top entries files)
+       put (Mix top entries files) = do mapM_ putLazyByteString files
+                                        put entries
+                                        put top
