@@ -31,7 +31,7 @@ data MixArchive = MixArchive
 data MixHeader = MixHeader
     {
       -- | number of internal files
-      numFiles :: Int16,  
+      numFiles :: Int16,
       -- | size of the body, not including this header and the index
       totalSize :: Int32
     }
@@ -40,7 +40,7 @@ data MixHeader = MixHeader
 -- | A MIX archive entry for a file
 data MixEntry = MixEntry
     {
-      -- | id, used to identify the file instead of a normal name     
+      -- | id, used to identify the file instead of a normal name
       id :: Word32,
       -- | offset from start of body
       offset :: Int32,
@@ -72,12 +72,12 @@ stringTOfilename a
 s2f1 :: Int -> [Char] -> Word32
 s2f1 5 xs  = 0
 s2f1 xk []  = 0
-s2f1 k xs 
+s2f1 k xs
   | k <= 4 = shiftL (charTOasciiword32 $ head xs) (8*k) + s2f1 (k+1) (tail xs)
 
 
 charTOasciiword32 :: Char -> Word32
-charTOasciiword32 c 
+charTOasciiword32 c
   | isAscii c = fromIntegral $ fromEnum $ toUpper c
   | otherwise = error "non-ascii"
 
@@ -103,3 +103,15 @@ makeIndexReal a b  = (MixEntry (makeID $ name c) a len) : makeIndexReal (a+len) 
   where
     c = head b
     len = fromIntegral $  L.length $ contents c
+
+--
+-- Extract Mix
+--
+
+--
+-- Read Mix
+--
+
+--
+-- Write Mix
+--
