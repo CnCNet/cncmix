@@ -137,10 +137,20 @@ instance Binary EntryHeader where
 
 
 instance Binary Mix where
-       get = do top <- get
-                entries <- replicateM (fromIntegral $ numFiles top) get
-                files <- mapM getLazyByteString $ map (fromIntegral .  size) entries
-                return (Mix top entries files)
-       put (Mix top entries files) = do mapM_ putLazyByteString files
-                                        put entries
-                                        put top
+  get = do top <- get
+           entries <- replicateM (fromIntegral $ numFiles top) get
+           files <- mapM getLazyByteString $ map (fromIntegral .  size) entries
+           return (Mix top entries files)
+
+  put (Mix top entries files) = do mapM_ putLazyByteString files
+                                   put entries
+                                   put top
+
+--
+-- Filename IO
+--
+
+openMix a  = do x <- L.readFile a
+                return $ (decode :: L.ByteString -> Mix) $ x
+
+closeMix a = L.writeFile a . (encode :: Mix -> L.ByteString)
