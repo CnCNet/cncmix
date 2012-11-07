@@ -112,6 +112,9 @@ makeIndexReal a b  = (EntryHeader (makeID $ name c) a len) : makeIndexReal (a+le
 -- Extract Mix
 --
 
+extractMix :: Mix -> [File]
+extractMix = map (File "<none>") . entryData
+
 --
 -- Read/Write Mix
 --
