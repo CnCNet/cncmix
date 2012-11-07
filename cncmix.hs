@@ -27,7 +27,7 @@ data Mix = Mix
       -- | length and offset for each file, IN REVERSE ORDER
       entryHeaders :: [EntryHeader],
       -- | the files themselves, IN REVERSE ORDER
-      entryData :: [L.ByteString]
+      entryData :: L.ByteString
     }
   deriving Show
 
@@ -94,7 +94,7 @@ makeID = (filenameTOid . stringTOfilename)
 -- | Creates a TAR archive containing a number of files
 createMix :: [File] -- ^ Filename + Bytestring pairs to include
                     -> Mix
-createMix x = Mix (makeMaster x) (makeIndex x) (map contents x)
+createMix x = Mix (makeMaster x) (makeIndex x) (L.concat $ map contents x)
 
 makeMaster x =  TopHeader (fromIntegral $ length x) (foldl (+) 0 (map (fromIntegral . L.length . contents) x))
 
@@ -113,7 +113,13 @@ makeIndexReal a b  = (EntryHeader (makeID $ name c) a len) : makeIndexReal (a+le
 --
 
 extractMix :: Mix -> [File]
-extractMix = map (File "<none>") . entryData
+extractMix m = map ((File "<none>") . (headToBS $ entryData m)) $ entryHeaders m
+ where
+ bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
+ headToBS bs entry   = ((bExtract (fromIntegral $ offset $ entry) $ fromIntegral $ size entry) bs)
+ -- do I need to sub1 ?
+
+
 
 --
 -- Read/Write Mix
@@ -142,14 +148,10 @@ instance Binary EntryHeader where
 instance Binary Mix where
   get = do top <- get
            entries <- replicateM (fromIntegral $ numFiles top) get
-           files <- mapM getLazyByteString $ map (fromIntegral .  size) entries
+           files <- get
            return (Mix top entries files)
-    where
-      bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
-      headToBS entry      = bExtract (fromIntegral $ offset $ entry) $ fromIntegral $ size entry
-      -- do I need to sub1 ? 
 
-  put (Mix top entries files) = do mapM_ putLazyByteString files
+  put (Mix top entries files) = do put files
                                    put entries
                                    put top
 
