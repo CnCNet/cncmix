@@ -144,6 +144,10 @@ instance Binary Mix where
            entries <- replicateM (fromIntegral $ numFiles top) get
            files <- mapM getLazyByteString $ map (fromIntegral .  size) entries
            return (Mix top entries files)
+    where
+      bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
+      headToBS entry      = bExtract (fromIntegral $ offset $ entry) $ fromIntegral $ size entry
+      -- do I need to sub1 ? 
 
   put (Mix top entries files) = do mapM_ putLazyByteString files
                                    put entries
@@ -155,6 +159,9 @@ instance Binary Mix where
                                    
 openFiles :: [FilePath] -> IO [File]
 openFiles = sequence . (map $ \c -> liftM2 File (return $ takeFileName c) $ L.readFile c)
+
+closeFiles :: FilePath -> [File] -> IO [()]
+closeFiles a = sequence . (map $ \c -> L.writeFile (a </> name c) $ contents c)
 
 openMix :: FilePath -> IO Mix
 openMix a  = do x <- L.readFile a
