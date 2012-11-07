@@ -152,8 +152,13 @@ instance Binary Mix where
 --
 -- Filename IO
 --
+                                   
+openFiles :: [FilePath] -> IO [File]
+openFiles = sequence . (map $ \c -> liftM2 File (return $ takeFileName c) $ L.readFile c)
 
+openMix :: FilePath -> IO Mix
 openMix a  = do x <- L.readFile a
                 return $ (decode :: L.ByteString -> Mix) $ x
 
+closeMix :: FilePath -> Mix -> IO ()
 closeMix a = L.writeFile a . (encode :: Mix -> L.ByteString)
