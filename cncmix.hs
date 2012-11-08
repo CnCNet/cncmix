@@ -95,17 +95,21 @@ makeID = (filenameTOid . stringTOfilename)
 -- | Creates a TAR archive containing a number of files
 createMix :: [File] -- ^ Filename + Bytestring pairs to include
                     -> Mix
-createMix x = Mix (makeMaster x) (makeIndex x) (L.concat $ map contents x)
+createMix x = Mix (makeMaster index) (snd index) (L.concat $ map contents x)
+  where index = (makeIndex x)
 
-makeMaster x = TopHeader (fromIntegral $ length x) (foldl (+) 0 (map (fromIntegral . L.length . contents) x))
+makeMaster x = TopHeader (fromIntegral $ length $ snd x)
+                         $ fst x
 
-makeIndex :: [File] -> [EntryHeader]
+makeIndex :: [File] -> (Int32, [EntryHeader])
 makeIndex = makeIndexReal 0
 
-makeIndexReal :: Int32 -> [File] -> [EntryHeader]
-makeIndexReal a [] = []
-makeIndexReal a b  = (EntryHeader (makeID $ name c) a len) : makeIndexReal (a+len) (tail b)
+makeIndexReal :: Int32 -> [File] -> (Int32, [EntryHeader])
+makeIndexReal a [] = (0, [])
+makeIndexReal a b  =  (len + (fst next), now : (snd next))
   where
+    now = (EntryHeader (makeID $ name c) a len)
+    next = makeIndexReal (a+len) (tail b)
     c = head b
     len = fromIntegral $  L.length $ contents c
 
@@ -117,8 +121,10 @@ extractMix :: Mix -> [File]
 extractMix m = map ((File "<none>") . (headToBS $ entryData m)) $ entryHeaders m
  where
  bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
- headToBS bs entry   = ((bExtract (fromIntegral $ offset $ entry) $ fromIntegral $ size entry) bs)
- -- do I need to sub1 ?
+ headToBS bs entry = bExtract (fromIntegral $ offset $ entry)
+                              (fromIntegral $ size $ entry)
+                              -- do I need to sub1 for start or stop?
+                              bs
 
 
 --
