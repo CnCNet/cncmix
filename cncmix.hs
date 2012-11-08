@@ -13,6 +13,7 @@ import Data.Binary.Get
 import Data.Binary.Put
 import Control.Monad
 
+
 --
 -- Datatypes
 --
@@ -26,7 +27,7 @@ data Mix = Mix
       masterHeader :: TopHeader,
       -- | length and offset for each file, IN REVERSE ORDER
       entryHeaders :: [EntryHeader],
-      -- | the files themselves, IN REVERSE ORDER
+      -- | the files themselves, concatenated together
       entryData :: L.ByteString
     }
   deriving Show
@@ -58,7 +59,6 @@ data EntryHeader = EntryHeader
 -- Hashing Function
 --
 
-
 filenameTOid :: [Word32] -> Word32
 filenameTOid = foldl rotsum 0
 
@@ -87,6 +87,7 @@ charTOasciiword32 c
 
 makeID = (filenameTOid . stringTOfilename)
 
+
 --
 -- Create MIX
 --
@@ -96,7 +97,7 @@ createMix :: [File] -- ^ Filename + Bytestring pairs to include
                     -> Mix
 createMix x = Mix (makeMaster x) (makeIndex x) (L.concat $ map contents x)
 
-makeMaster x =  TopHeader (fromIntegral $ length x) (foldl (+) 0 (map (fromIntegral . L.length . contents) x))
+makeMaster x = TopHeader (fromIntegral $ length x) (foldl (+) 0 (map (fromIntegral . L.length . contents) x))
 
 makeIndex :: [File] -> [EntryHeader]
 makeIndex = makeIndexReal 0
@@ -118,7 +119,6 @@ extractMix m = map ((File "<none>") . (headToBS $ entryData m)) $ entryHeaders m
  bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
  headToBS bs entry   = ((bExtract (fromIntegral $ offset $ entry) $ fromIntegral $ size entry) bs)
  -- do I need to sub1 ?
-
 
 
 --
@@ -155,19 +155,19 @@ instance Binary Mix where
                                    put entries
                                    put top
 
+
 --
 -- Filename IO
 --
-                                   
+
 openFiles :: [FilePath] -> IO [File]
-openFiles = sequence . (map $ \c -> liftM2 File (return $ takeFileName c) $ L.readFile c)
+openFiles = mapM $ \c -> liftM2 File (return $ takeFileName c) $ L.readFile c
 
 closeFiles :: FilePath -> [File] -> IO [()]
-closeFiles a = sequence . (map $ \c -> L.writeFile (a </> name c) $ contents c)
+closeFiles a = mapM $ \c -> L.writeFile (a </> name c) $ contents c
 
 openMix :: FilePath -> IO Mix
-openMix a  = do x <- L.readFile a
-                return $ (decode :: L.ByteString -> Mix) $ x
+openMix = liftM decode . L.readFile
 
 closeMix :: FilePath -> Mix -> IO ()
-closeMix a = L.writeFile a . (encode :: Mix -> L.ByteString)
+closeMix a = L.writeFile a . encode
