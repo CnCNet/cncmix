@@ -5,13 +5,16 @@ import Data.Int
 import Data.Bits
 import Data.Char
 
+import Numeric
+
 import System.FilePath
 import qualified Data.ByteString.Lazy as L
 
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
-import Control.Monad
+
+import qualified Control.Monad as S
 
 
 --
@@ -118,13 +121,14 @@ makeIndexReal a b  =  (len + (fst next), now : (snd next))
 --
 
 extractMix :: Mix -> [File]
-extractMix m = map ((File "<none>") . (headToBS $ entryData m)) $ entryHeaders m
- where
- bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
- headToBS bs entry = bExtract (fromIntegral $ offset $ entry)
+extractMix m = map (\x -> File (showHex (Codec.Archive.CnCMix.id x) "")
+                          $ headToBS x $ entryData m)
+               $ entryHeaders m
+  where
+    bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
+    headToBS entry = bExtract (fromIntegral $ offset $ entry)
                               (fromIntegral $ size $ entry)
                               -- do I need to sub1 for start or stop?
-                              bs
 
 
 --
@@ -153,7 +157,7 @@ instance Binary EntryHeader where
 
 instance Binary Mix where
   get = do top <- get
-           entries <- replicateM (fromIntegral $ numFiles top) get
+           entries <- S.replicateM (fromIntegral $ numFiles top) get
            files <- get
            return (Mix top entries files)
 
@@ -167,13 +171,24 @@ instance Binary Mix where
 --
 
 openFiles :: [FilePath] -> IO [File]
-openFiles = mapM $ \c -> liftM2 File (return $ takeFileName c) $ L.readFile c
+openFiles = S.mapM $ \c -> S.liftM2 File (return $ takeFileName c) $ L.readFile c
 
 closeFiles :: FilePath -> [File] -> IO [()]
-closeFiles a = mapM $ \c -> L.writeFile (a </> name c) $ contents c
+closeFiles a = S.mapM $ \c -> L.writeFile (a </> name c) $ contents c
 
 openMix :: FilePath -> IO Mix
-openMix = liftM decode . L.readFile
+openMix = S.liftM decode . L.readFile
 
 closeMix :: FilePath -> Mix -> IO ()
 closeMix a = L.writeFile a . encode
+
+
+--
+-- Show Metadata
+--
+
+showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
+showMixHeaders a = (masterHeader a, entryHeaders a)
+
+showFileNames :: [File] -> [String]
+showFileNames = map (name :: File -> String)
