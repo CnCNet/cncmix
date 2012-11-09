@@ -1,4 +1,6 @@
-module Codec.Archive.CnCMix where
+module Codec.Archive.CnCMix.TD where
+
+import Codec.Archive.CnCMix
 
 import Data.Word
 import Data.Int
@@ -121,7 +123,7 @@ makeIndexReal a b  =  (len + (fst next), now : (snd next))
 --
 
 extractMix :: Mix -> [File]
-extractMix m = map (\x -> File (showHex (Codec.Archive.CnCMix.id x) "")
+extractMix m = map (\x -> File (showHex (Codec.Archive.CnCMix.TD.id x) "")
                           $ headToBS x $ entryData m)
                $ entryHeaders m
   where
