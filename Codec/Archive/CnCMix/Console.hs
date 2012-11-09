@@ -1,7 +1,6 @@
 module Codec.Archive.CnCMix.Console where
 
-import qualified Codec.Archive.CnCMix.TD as TD
---import qualified Codec.Archive.CnCMix.RA as RA
+import Codec.Archive.CnCMix
 
 --Main :: IO ()
---Main = do 
+--Main = do

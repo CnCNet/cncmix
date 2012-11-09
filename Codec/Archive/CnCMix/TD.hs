@@ -1,6 +1,6 @@
 module Codec.Archive.CnCMix.TD where
 
-import Codec.Archive.CnCMix
+import Codec.Archive.CnCMix.Backend
 
 import Data.Word
 import Data.Int
@@ -17,16 +17,15 @@ import Data.Binary.Get
 import Data.Binary.Put
 
 import qualified Control.Monad as S
+--import qualified Control.Monad.Parallel as P
 
 
 --
 -- Datatypes
 --
 
-data File = File { name :: String, contents :: L.ByteString }
-
 -- | A Command & Conquer MIX archive.
-data Mix = Mix
+data TiberianDawn = TiberianDawn
     {
       -- | most importantly, gives filecount
       masterHeader :: TopHeader,
@@ -37,7 +36,7 @@ data Mix = Mix
     }
   deriving Show
 
--- | The Master header for a Mix
+-- | The Master header for a TiberianDawn
 data TopHeader = TopHeader
     {
       -- | number of internal files
@@ -94,17 +93,10 @@ makeID = (filenameTOid . stringTOfilename)
 
 
 --
--- Create MIX
+-- Create/Extract Mix Headers
 --
-
--- | Creates a TAR archive containing a number of files
-createMix :: [File] -- ^ Filename + Bytestring pairs to include
-                    -> Mix
-createMix x = Mix (makeMaster index) (snd index) (L.concat $ map contents x)
-  where index = (makeIndex x)
-
 makeMaster x = TopHeader (fromIntegral $ length $ snd x)
-                         $ fst x
+                       $ fst x
 
 makeIndex :: [File] -> (Int32, [EntryHeader])
 makeIndex = makeIndexReal 0
@@ -119,22 +111,26 @@ makeIndexReal a b  =  (len + (fst next), now : (snd next))
     len = fromIntegral $  L.length $ contents c
 
 --
--- Extract Mix
+--Mix Class Instance
 --
 
-extractMix :: Mix -> [File]
-extractMix m = map (\x -> File (showHex (Codec.Archive.CnCMix.TD.id x) "")
-                          $ headToBS x $ entryData m)
+instance Mix TiberianDawn where
+  filesToMix x = TiberianDawn (makeMaster index) (snd index) (L.concat $ map contents x)
+    where index = (makeIndex x)
+
+
+  mixToFiles m = map (\x -> File (showHex (Codec.Archive.CnCMix.TD.id x) "")
+                            $ headToBS x $ entryData m)
                $ entryHeaders m
-  where
-    bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
-    headToBS entry = bExtract (fromIntegral $ offset $ entry)
-                              (fromIntegral $ size $ entry)
-                              -- do I need to sub1 for start or stop?
+    where
+      bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
+      headToBS entry = bExtract (fromIntegral $ offset $ entry)
+                                (fromIntegral $ size $ entry)
+                                -- do I need to sub1 for start or stop?
 
 
 --
--- Read/Write Mix
+-- decode/encode Mix
 --
 
 instance Binary TopHeader where
@@ -157,40 +153,18 @@ instance Binary EntryHeader where
                                putWord32le $ fromIntegral a
 
 
-instance Binary Mix where
+instance Binary TiberianDawn where
   get = do top <- get
            entries <- S.replicateM (fromIntegral $ numFiles top) get
            files <- get
-           return (Mix top entries files)
+           return (TiberianDawn top entries files)
 
-  put (Mix top entries files) = do put files
-                                   put entries
-                                   put top
-
-
---
--- Filename IO
---
-
-openFiles :: [FilePath] -> IO [File]
-openFiles = S.mapM $ \c -> S.liftM2 File (return $ takeFileName c) $ L.readFile c
-
-closeFiles :: FilePath -> [File] -> IO [()]
-closeFiles a = S.mapM $ \c -> L.writeFile (a </> name c) $ contents c
-
-openMix :: FilePath -> IO Mix
-openMix = S.liftM decode . L.readFile
-
-closeMix :: FilePath -> Mix -> IO ()
-closeMix a = L.writeFile a . encode
-
+  put (TiberianDawn top entries files) = do put files
+                                            put entries
+                                            put top
 
 --
 -- Show Metadata
 --
 
-showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
-showMixHeaders a = (masterHeader a, entryHeaders a)
-
-showFileNames :: [File] -> [String]
-showFileNames = map (name :: File -> String)
+showMixHeaders a = (masterHeader a , entryHeaders a)
