@@ -56,11 +56,5 @@ class (Binary a) => Mix a where
   removeByName :: string -> a
   removeByID :: word32 -> a
 
-  readMix :: FilePath -> IO a
-  readMix = S.liftM decode . L.readFile
-
-  writeMix :: FilePath -> a -> IO ()
-  writeMix a = L.writeFile a . encode
-
 showFileNames :: [File] -> [String]
 showFileNames = map (name :: File -> String)
