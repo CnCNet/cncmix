@@ -25,16 +25,36 @@ import qualified Control.Monad as S
 
 data File = File { name :: String, contents :: L.ByteString }
 
+--
+-- Generic File Operators
+--
+
+readFile :: FilePath -> IO File
+readFile c = S.liftM2 File (return $ takeFileName c) $ L.readFile c
+
 readFiles :: [FilePath] -> IO [File]
-readFiles = S.mapM $ \c -> S.liftM2 File (return $ takeFileName c) $ L.readFile c
+readFiles = S.mapM $ Codec.Archive.CnCMix.Backend.readFile
+
+writeFile :: FilePath -> File -> IO ()
+writeFile a c = L.writeFile (a </> name c) $ contents c
 
 writeFiles :: FilePath -> [File] -> IO [()]
-writeFiles a = S.mapM $ \c -> L.writeFile (a </> name c) $ contents c
+writeFiles a = S.mapM (Codec.Archive.CnCMix.Backend.writeFile a)
 
+--
+-- Mix Type Class
+--
 class (Binary a) => Mix a where
   -- | Creates a TAR archive containing a number of files
   filesToMix :: [File] -> a
   mixToFiles :: a -> [File]
+
+  cons :: File -> a -> a
+  head :: a -> File
+  tail :: a -> a
+
+  removeByName :: string -> a
+  removeByID :: word32 -> a
 
   readMix :: FilePath -> IO a
   readMix = S.liftM decode . L.readFile
