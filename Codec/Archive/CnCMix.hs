@@ -30,12 +30,18 @@ import qualified Control.Monad as S
 import Data.Bool
 
 
-data CnCGame = TiberianDawn
-             | RedAlert
+data MixType = TiberianDawn
+             | RedAlertChecksum
+             | RedAlertEncrypted
              | TiberianSun
              | RedAlert2
              | Renegade
-             deriving Enum
+             deriving (Eq, Ord, Show, Read, Bounded, Enum)
+
+detect a = case runGet getWord32le a of
+  0x00010000 -> RedAlertChecksum
+  0x00020000 -> RedAlertEncrypted
+  _          -> TiberianDawn
 
 --filesMixIO :: FilePath -> [FilePath] -> IO ()
 --filesMixIO a = ((S.liftM filesToMix) . readFiles) S.>=> (writeMix a)
