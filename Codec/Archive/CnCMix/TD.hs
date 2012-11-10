@@ -63,19 +63,17 @@ data EntryHeader = EntryHeader
 -- Hashing Function
 --
 
-filenameTOid :: [Word32] -> Word32
-filenameTOid = foldl rotsum 0
+words32ToId :: [Word32] -> Word32
+words32ToId = foldl rotsum 0
 
 rotsum :: Word32 -> Word32 -> Word32
 rotsum a b = a + (b `rotateL` 1)
 
-
-stringTOfilename :: [Char] -> [Word32]
-stringTOfilename [] = []
-stringTOfilename a
+stringToWords32 :: [Char] -> [Word32]
+stringToWords32 [] = []
+stringToWords32 a
   | length a<=4 = (s2f1 1 a) : []
-  | length a>4  = (s2f1 1 a) : (stringTOfilename ((tail . tail . tail . tail) a))
-
+  | length a>4  = (s2f1 1 a) : (stringToWords32 ((tail . tail . tail . tail) a))
 
 s2f1 :: Int -> [Char] -> Word32
 s2f1 5 xs  = 0
@@ -83,18 +81,18 @@ s2f1 xk []  = 0
 s2f1 k xs
   | k <= 4 = shiftL (charTOasciiword32 $ head xs) (8*k) + s2f1 (k+1) (tail xs)
 
-
 charTOasciiword32 :: Char -> Word32
 charTOasciiword32 c
   | isAscii c = fromIntegral $ fromEnum $ toUpper c
   | otherwise = error "non-ascii"
 
-makeID = (filenameTOid . stringTOfilename)
+stringToId = (words32ToId . stringToWords32)
 
 
 --
 -- Create/Extract Mix Headers
 --
+
 makeMaster x = TopHeader (fromIntegral $ length $ snd x)
                        $ fst x
 
@@ -105,7 +103,7 @@ makeIndexReal :: Int32 -> [File] -> (Int32, [EntryHeader])
 makeIndexReal a [] = (0, [])
 makeIndexReal a b  =  (len + (fst next), now : (snd next))
   where
-    now = (EntryHeader (makeID $ name c) a len)
+    now = (EntryHeader (stringToId $ name c) a len)
     next = makeIndexReal (a+len) (tail b)
     c = head b
     len = fromIntegral $  L.length $ contents c
