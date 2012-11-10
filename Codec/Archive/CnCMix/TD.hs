@@ -1,6 +1,6 @@
 module Codec.Archive.CnCMix.TD where
 
-import Codec.Archive.CnCMix.Backend
+import qualified Codec.Archive.CnCMix.Backend as CM
 
 import Data.Word
 import Data.Int
@@ -96,28 +96,28 @@ stringToId = (words32ToId . stringToWords32)
 makeMaster x = TopHeader (fromIntegral $ length $ snd x)
                        $ fst x
 
-makeIndex :: [File] -> (Int32, [EntryHeader])
+makeIndex :: [CM.File] -> (Int32, [EntryHeader])
 makeIndex = makeIndexReal 0
 
-makeIndexReal :: Int32 -> [File] -> (Int32, [EntryHeader])
+makeIndexReal :: Int32 -> [CM.File] -> (Int32, [EntryHeader])
 makeIndexReal a [] = (0, [])
 makeIndexReal a b  =  (len + (fst next), now : (snd next))
   where
-    now = (EntryHeader (stringToId $ name c) a len)
+    now = (EntryHeader (stringToId $ CM.name c) a len)
     next = makeIndexReal (a+len) (tail b)
     c = head b
-    len = fromIntegral $  L.length $ contents c
+    len = fromIntegral $  L.length $ CM.contents c
 
 --
 --Mix Class Instance
 --
 
-instance Mix TiberianDawn where
-  filesToMix x = TiberianDawn (makeMaster index) (snd index) (L.concat $ map contents x)
+instance CM.Mix TiberianDawn where
+  filesToMix x = TiberianDawn (makeMaster index) (snd index) (L.concat $ map CM.contents x)
     where index = (makeIndex x)
 
 
-  mixToFiles m = map (\x -> File (showHex (Codec.Archive.CnCMix.TD.id x) "")
+  mixToFiles m = map (\x -> CM.File (showHex (Codec.Archive.CnCMix.TD.id x) "")
                             $ headToBS x $ entryData m)
                $ entryHeaders m
     where
