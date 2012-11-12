@@ -49,9 +49,16 @@ class (Binary a) => Mix a where
   filesToMix :: [File] -> a
   mixToFiles :: a -> [File]
 
+
   cons :: File -> a -> a
+  cons f = filesToMix . (f :) . mixToFiles
+
   head :: a -> File
+  head = Prelude.head . mixToFiles
+
   tail :: a -> a
+  tail = filesToMix . Prelude.tail . mixToFiles
+
 
   removeByName :: string -> a
   removeByID :: word32 -> a
