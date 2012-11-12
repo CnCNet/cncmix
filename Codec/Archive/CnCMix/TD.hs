@@ -63,30 +63,37 @@ data EntryHeader = EntryHeader
 -- Hashing Function
 --
 
-words32ToId :: [Word32] -> Word32
-words32ToId = foldl rotsum 0
+word32sToId :: [Word32] -> Word32
+word32sToId     [] = 0
+word32sToId (a:as) = foldl rotsum a as
 
 rotsum :: Word32 -> Word32 -> Word32
-rotsum a b = a + (b `rotateL` 1)
+rotsum accum new = new + (rotateL accum 1)
 
-stringToWords32 :: [Char] -> [Word32]
-stringToWords32 [] = []
-stringToWords32 a
-  | length a<=4 = (s2f1 1 a) : []
-  | length a>4  = (s2f1 1 a) : (stringToWords32 ((tail . tail . tail . tail) a))
+stringToWord32s :: [Char] -> [Word32]
+stringToWord32s [] = []
+stringToWord32s a
+  | length a<=4 = (stringToWord32 4 0 a) : []
+  | length a>4  = (stringToWord32 4 0 $ take 4 a) : (stringToWord32s $ drop 4 a)
 
-s2f1 :: Int -> [Char] -> Word32
-s2f1 5 xs  = 0
-s2f1 xk []  = 0
-s2f1 k xs
-  | k <= 4 = shiftL (charTOasciiword32 $ head xs) (8*k) + s2f1 (k+1) (tail xs)
+stringToWord32 :: Int -> Word32 -> [Char] -> Word32
+stringToWord32 0     accum _      = accum
+stringToWord32 count accum []     = stringToWord32
+                                    (count - 1)
+                                    (shiftR accum 8)
+                                    []
+stringToWord32 count accum (x:xs) = stringToWord32
+                                    (count - 1)
+                                    ((+) (shiftR accum 8)
+                                     $ asciiCharToWord32 $ x)
+                                    xs
 
-charTOasciiword32 :: Char -> Word32
-charTOasciiword32 c
-  | isAscii c = fromIntegral $ fromEnum $ toUpper c
+asciiCharToWord32 :: Char -> Word32
+asciiCharToWord32 c
+  | isAscii c = shiftL (fromIntegral $ fromEnum $ toUpper c) 24
   | otherwise = error "non-ascii"
 
-stringToId = (words32ToId . stringToWords32)
+stringToId = (word32sToId . stringToWord32s)
 
 
 --
