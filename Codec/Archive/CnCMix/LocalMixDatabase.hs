@@ -18,6 +18,9 @@ import Data.Binary.Put
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
+revMap f = foldl (\ys x -> f x : ys) []
+revMapM  f = S.sequence . revMap f
+revMapM_ f = S.sequence_ . revMap f
 --
 -- Datatypes
 --
@@ -38,13 +41,22 @@ getAllCStrings accum = do pred <- isEmpty
                                  $ (S.liftM2 (:)) ((S.liftM C.unpack) getLazyByteStringNul)
                                  $ return accum
 
+putAsCString s = do putLazyByteString $ C.pack s
+                    putWord8 0x0
+
+lengthLMD l = (foldl (\o n ->o + length n) 0 l) + length l
+
 instance Binary LocalMixDatabase where
   get = do skip 32 --Static info
-           size <- getWord16be
-           skip 4
+           --size <- getWord128be
+           skip 20 --size + filler
            (S.liftM LocalMixDatabase) $ getAllCStrings [[]]
 
   put (LocalMixDatabase fileNames) =
-    do mapM_ (put . C.pack) fileNames
+    do putLazyByteString $ C.pack "XCC by Olaf van der Spek"
        S.mapM putWord8 (0x1A : 0x04 : 0x17 : 0x27 : 0x10 : 0x19 : 0x80 : 0x00 : [])
-       put $ C.pack "XCC by Olaf van der Spek"
+
+       putWord64be $ fromIntegral $ lengthLMD fileNames
+       S.replicateM_ 11 $ putWord8 0
+
+       revMapM_ putAsCString fileNames
