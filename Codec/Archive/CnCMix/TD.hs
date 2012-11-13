@@ -73,24 +73,20 @@ rotsum accum new = new + (rotateL accum 1)
 stringToWord32s :: [Char] -> [Word32]
 stringToWord32s [] = []
 stringToWord32s a
-  | length a<=4 = (stringToWord32 4 0 a) : []
-  | length a>4  = (stringToWord32 4 0 $ take 4 a) : (stringToWord32s $ drop 4 a)
+  | length a<=4 = (stringToWord32 0 0 a) : []
+  | length a>4  = (stringToWord32 0 0 $ take 4 a) : (stringToWord32s $ drop 4 a)
 
 stringToWord32 :: Int -> Word32 -> [Char] -> Word32
-stringToWord32 0     accum _      = accum
-stringToWord32 count accum []     = stringToWord32
-                                    (count - 1)
-                                    (shiftR accum 8)
-                                    []
+stringToWord32 4     accum _      = accum
+stringToWord32 _     accum []     = accum
 stringToWord32 count accum (x:xs) = stringToWord32
-                                    (count - 1)
-                                    ((+) (shiftR accum 8)
-                                     $ asciiCharToWord32 $ x)
+                                    (count + 1)
+                                    (accum + shiftL (asciiCharToWord32 x) (count*8))
                                     xs
 
 asciiCharToWord32 :: Char -> Word32
 asciiCharToWord32 c
-  | isAscii c = shiftL (fromIntegral $ fromEnum $ toUpper c) 24
+  | isAscii c = (fromIntegral $ fromEnum $ toUpper c)
   | otherwise = error "non-ascii"
 
 stringToId = (word32sToId . stringToWord32s)
