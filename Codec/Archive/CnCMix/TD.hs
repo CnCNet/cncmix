@@ -116,22 +116,8 @@ makeIndexReal a b  =  (len + (fst next), now : (snd next))
     len = fromIntegral $  L.length $ CM.contents c
 
 --
---Mix Class Instance
+-- Local Mix Database support
 --
-
-instance CM.Mix TiberianDawn where
-  filesToMix x = TiberianDawn (makeMaster index) (snd index) (L.concat $ map CM.contents x)
-    where index = (makeIndex x)
-
-
-  mixToFiles m = map (\x -> CM.File (showHex (Codec.Archive.CnCMix.TD.id x) "")
-                            $ headToBS x $ entryData m)
-               $ entryHeaders m
-    where
-      bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
-      headToBS entry = bExtract (fromIntegral $ offset $ entry)
-                                (fromIntegral $ size $ entry)
-                                -- do I need to sub1 for start or stop?
 
 
 --
@@ -157,7 +143,6 @@ instance Binary EntryHeader where
                                putWord32le $ fromIntegral b
                                putWord32le $ fromIntegral a
 
-
 instance Binary TiberianDawn where
   get = do top <- get
            entries <- S.replicateM (fromIntegral $ numFiles top) get
@@ -167,6 +152,26 @@ instance Binary TiberianDawn where
   put (TiberianDawn top entries files) = do put files
                                             put entries
                                             put top
+
+
+--
+-- Mix Class Instance
+--
+
+instance CM.Mix TiberianDawn where
+  filesToMix x = TiberianDawn (makeMaster index) (snd index) (L.concat $ map CM.contents x)
+    where index = (makeIndex x)
+
+
+  mixToFiles m = map (\x -> CM.File (showHex (Codec.Archive.CnCMix.TD.id x) "")
+                            $ headToBS x $ entryData m)
+               $ entryHeaders m
+    where
+      bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
+      headToBS entry = bExtract (fromIntegral $ offset $ entry)
+                                (fromIntegral $ size $ entry)
+                                -- do I need to sub1 for start or stop?
+
 
 --
 -- Show Metadata
