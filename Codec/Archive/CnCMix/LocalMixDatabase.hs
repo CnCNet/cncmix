@@ -21,6 +21,10 @@ import qualified Control.Monad as S
 revMap f = foldl (\ys x -> f x : ys) []
 revMapM  f = S.sequence . revMap f
 revMapM_ f = S.sequence_ . revMap f
+revSequence ms = foldl k (return []) ms
+            where
+              k m' m = do { x <- m; xs <- m'; return (x:xs) }
+
 --
 -- Datatypes
 --
@@ -38,25 +42,25 @@ getAllCStrings accum = do pred <- isEmpty
                           if pred
                             then return accum
                             else (=<<) getAllCStrings
-                                 $ (S.liftM2 (:)) ((S.liftM C.unpack) getLazyByteStringNul)
+                                 $ (S.liftM2 (:)) (S.liftM C.unpack getLazyByteStringNul)
                                  $ return accum
 
 putAsCString s = do putLazyByteString $ C.pack s
                     putWord8 0x0
 
-lengthLMD l = (foldl (\o n ->o + length n) 0 l) + length l
+lengthLMD l = (foldl (\o n ->o + length n) 0 l) + length l + 52
 
 instance Binary LocalMixDatabase where
   get = do skip 32 --Static info
-           --size <- getWord128be
-           skip 20 --size + filler
-           (S.liftM LocalMixDatabase) $ getAllCStrings [[]]
+           skip 16 --total size
+           count <- getWord32le
+           S.liftM LocalMixDatabase $ S.replicateM (fromIntegral count)
+             $ S.liftM C.unpack getLazyByteStringNul
 
   put (LocalMixDatabase fileNames) =
     do putLazyByteString $ C.pack "XCC by Olaf van der Spek"
        S.mapM putWord8 (0x1A : 0x04 : 0x17 : 0x27 : 0x10 : 0x19 : 0x80 : 0x00 : [])
-
-       putWord64be $ fromIntegral $ lengthLMD fileNames
-       S.replicateM_ 11 $ putWord8 0
-
-       revMapM_ putAsCString fileNames
+       putWord64le $ fromIntegral $ lengthLMD fileNames --size of database
+       S.replicateM_ 8 $ putWord8 0
+       putWord32le $ fromIntegral $ length fileNames --number of strings
+       S.mapM_ putAsCString fileNames --filenames themselves
