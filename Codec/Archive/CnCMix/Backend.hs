@@ -23,14 +23,15 @@ import Data.Binary.Put
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
-data File = File { name :: String, contents :: L.ByteString }
+data File = FileS { name :: String, contents :: L.ByteString }
+          | FileW { id   :: Word32, contents :: L.ByteString }
 
 --
 -- Generic File Operators
 --
 
 readFile :: FilePath -> IO File
-readFile c = S.liftM2 File (return $ takeFileName c) $ L.readFile c
+readFile c = S.liftM2 FileS (return $ takeFileName c) $ L.readFile c
 
 readFiles :: [FilePath] -> IO [File]
 readFiles = S.mapM $ Codec.Archive.CnCMix.Backend.readFile

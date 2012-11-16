@@ -1,6 +1,7 @@
 module Codec.Archive.CnCMix.TD where
 
 import qualified Codec.Archive.CnCMix.Backend as CM
+import Codec.Archive.CnCMix.LocalMixDatabase
 
 import Data.Word
 import Data.Int
@@ -145,6 +146,17 @@ makeIndexReal a b  =  (len + (fst next), now : (snd next))
     c = head b
     len = fromIntegral $  L.length $ CM.contents c
 
+saveNames [CM.FileS n c] = (CM.FileS "local mix database.dat"
+                         $ encode $ LocalMixDatabase $
+                         "local mix database.dat" : [n])
+                        : [CM.FileS n c]
+saveNames [CM.FileW i c] = [CM.FileW i c]
+
+loadNames [CM.FileS n c] = [CM.FileS n c]
+loadNames [CM.FileW i c] = let lmd = head $ filter ((0x54c2d545 ==) . CM.id) [CM.FileW i c]
+                           in  zipWith CM.FileS
+                               (getLMD $ decode $ CM.contents lmd)
+                               [c]
 
 --
 -- Archive Class Instance
@@ -155,8 +167,8 @@ instance CM.Archive Mix where
     where index = (makeIndex x)
 
 
-  archiveToFiles m = map (\x -> CM.File (showHex (Codec.Archive.CnCMix.TD.id x) "")
-                            $ headToBS x $ entryData m)
+  archiveToFiles m = map (\x -> CM.FileW (Codec.Archive.CnCMix.TD.id x)
+                                $ headToBS x $ entryData m)
                $ entryHeaders m
     where
       bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
