@@ -18,32 +18,8 @@ import Data.Binary.Put
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
-revMap f = foldl (\ys x -> f x : ys) []
-revMapM  f = S.sequence . revMap f
-revMapM_ f = S.sequence_ . revMap f
-revSequence ms = foldl k (return []) ms
-            where
-              k m' m = do { x <- m; xs <- m'; return (x:xs) }
 
---
--- Datatypes
---
-
-data LocalMixDatabase = LocalMixDatabase
-    { -- | filenames, IN REVERSE ORDER
-      fileNames :: [[Char]]
-    }
-  deriving Show
-
---type LocalMixDatabase = [[Char]]
-
-getAllCStrings :: [[Char]] -> Get [[Char]]
-getAllCStrings accum = do pred <- isEmpty
-                          if pred
-                            then return accum
-                            else (=<<) getAllCStrings
-                                 $ (S.liftM2 (:)) (S.liftM C.unpack getLazyByteStringNul)
-                                 $ return accum
+data LocalMixDatabase = LocalMixDatabase [[Char]]
 
 putAsCString s = do putLazyByteString $ C.pack s
                     putWord8 0x0
