@@ -25,7 +25,7 @@ import qualified Control.Monad as S
 --
 
 -- | A Command & Conquer MIX archive.
-data TiberianDawn = TiberianDawn
+data Mix = Mix
     {
       -- | most importantly, gives filecount
       masterHeader :: TopHeader,
@@ -36,7 +36,7 @@ data TiberianDawn = TiberianDawn
     }
   deriving Show
 
--- | The Master header for a TiberianDawn
+-- | The Master header for a Mix
 data TopHeader = TopHeader
     {
       -- | number of internal files
@@ -139,27 +139,27 @@ instance Binary EntryHeader where
                                putWord32le $ fromIntegral b
                                putWord32le $ fromIntegral a
 
-instance Binary TiberianDawn where
+instance Binary Mix where
   get = do top <- get
            entries <- S.replicateM (fromIntegral $ numFiles top) get
            files <- get
-           return (TiberianDawn top entries files)
+           return (Mix top entries files)
 
-  put (TiberianDawn top entries files) = do put files
-                                            put entries
-                                            put top
+  put (Mix top entries files) = do put files
+                                   put entries
+                                   put top
 
 
 --
--- Mix Class Instance
+-- Archive Class Instance
 --
 
-instance CM.Mix TiberianDawn where
-  filesToMix x = TiberianDawn (makeMaster index) (snd index) (L.concat $ map CM.contents x)
+instance CM.Archive Mix where
+  filesToArchive x = Mix (makeMaster index) (snd index) (L.concat $ map CM.contents x)
     where index = (makeIndex x)
 
 
-  mixToFiles m = map (\x -> CM.File (showHex (Codec.Archive.CnCMix.TD.id x) "")
+  archiveToFiles m = map (\x -> CM.File (showHex (Codec.Archive.CnCMix.TD.id x) "")
                             $ headToBS x $ entryData m)
                $ entryHeaders m
     where

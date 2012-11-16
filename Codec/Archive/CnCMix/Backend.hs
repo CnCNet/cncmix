@@ -42,22 +42,22 @@ writeFiles :: FilePath -> [File] -> IO [()]
 writeFiles a = S.mapM (Codec.Archive.CnCMix.Backend.writeFile a)
 
 --
--- Mix Type Class
+-- Archive Type Class
 --
-class (Binary a) => Mix a where
+class (Binary a) => Archive a where
   -- | Creates a TAR archive containing a number of files
-  filesToMix :: [File] -> a
-  mixToFiles :: a -> [File]
+  filesToArchive :: [File] -> a
+  archiveToFiles :: a -> [File]
 
 
   cons :: File -> a -> a
-  cons f = filesToMix . (f :) . mixToFiles
+  cons f = filesToArchive . (f :) . archiveToFiles
 
   head :: a -> File
-  head = Prelude.head . mixToFiles
+  head = Prelude.head . archiveToFiles
 
   tail :: a -> a
-  tail = filesToMix . Prelude.tail . mixToFiles
+  tail = filesToArchive . Prelude.tail . archiveToFiles
 
 
   removeByName :: string -> a
