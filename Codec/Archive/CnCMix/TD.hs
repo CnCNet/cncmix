@@ -24,7 +24,7 @@ import qualified Control.Monad as S
 -- Datatypes
 --
 
--- | A Command & Conquer MIX archive.
+-- | A Command & Conquer: Tiberian Dawn MIX archive.
 data Mix = Mix
     {
       -- | most importantly, gives filecount
@@ -93,6 +93,40 @@ stringToId = (word32sToId . stringToWord32s)
 
 
 --
+-- decode/encode Mix
+--
+
+instance Binary TopHeader where
+  get = do a <- getWord16le
+           b <- getWord32le
+           return $ TopHeader (fromIntegral a) $ fromIntegral b
+
+  put (TopHeader a b) = do putWord16le $ fromIntegral a
+                           putWord32le $ fromIntegral b
+
+
+instance Binary EntryHeader where
+  get = do a <- getWord32le
+           b <- getWord32le
+           c <- getWord32le
+           return $ EntryHeader (fromIntegral a) (fromIntegral b) $ fromIntegral c
+
+  put (EntryHeader a b c) = do putWord32le a
+                               putWord32le $ fromIntegral b
+                               putWord32le $ fromIntegral c
+
+instance Binary Mix where
+  get = do top <- get
+           entries <- S.replicateM (fromIntegral $ numFiles top) get
+           files <- getRemainingLazyByteString
+           return $ Mix top entries files
+
+  put (Mix top entries files) = do put top
+                                   S.mapM put entries
+                                   putLazyByteString files
+
+
+--
 -- Create/Extract Mix Headers
 --
 
@@ -110,44 +144,6 @@ makeIndexReal a b  =  (len + (fst next), now : (snd next))
     next = makeIndexReal (a+len) (tail b)
     c = head b
     len = fromIntegral $  L.length $ CM.contents c
-
---
--- Local Mix Database support
---
-
-
---
--- decode/encode Mix
---
-
-instance Binary TopHeader where
-  get = do a <- getWord16le
-           b <- getWord32le
-           return (TopHeader (fromIntegral a) (fromIntegral b))
-
-  put (TopHeader a b) = do putWord16le $ fromIntegral b
-                           putWord32le $ fromIntegral a
-
-
-instance Binary EntryHeader where
-  get = do a <- getWord32le
-           b <- getWord32le
-           c <- getWord32le
-           return (EntryHeader (fromIntegral a) (fromIntegral b) (fromIntegral c))
-
-  put (EntryHeader a b c) = do putWord16le $ fromIntegral c
-                               putWord32le $ fromIntegral b
-                               putWord32le $ fromIntegral a
-
-instance Binary Mix where
-  get = do top <- get
-           entries <- S.replicateM (fromIntegral $ numFiles top) get
-           files <- get
-           return (Mix top entries files)
-
-  put (Mix top entries files) = do put files
-                                   put entries
-                                   put top
 
 
 --
