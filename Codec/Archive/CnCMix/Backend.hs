@@ -25,6 +25,7 @@ import qualified Control.Monad as S
 
 data File = FileS { name :: String, contents :: L.ByteString }
           | FileW { id   :: Word32, contents :: L.ByteString }
+          deriving (Show, Read, Eq)
 
 --
 -- Generic File Operators

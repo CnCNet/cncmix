@@ -35,7 +35,7 @@ data Mix = Mix
       -- | the files themselves, concatenated together
       entryData :: L.ByteString
     }
-  deriving Show
+  deriving (Show, Eq)
 
 -- | The Master header for a Mix
 data TopHeader = TopHeader
@@ -45,7 +45,7 @@ data TopHeader = TopHeader
       -- | size of the body, not including this header and the index
       totalSize :: Int32
     }
-  deriving Show
+  deriving (Show, Eq)
 
 -- | A MIX archive entry for a file
 data EntryHeader = EntryHeader
@@ -57,7 +57,7 @@ data EntryHeader = EntryHeader
       -- | size of this internal file
       size :: Int32
     }
-  deriving Show
+  deriving (Show, Eq)
 
 
 --
@@ -141,22 +141,41 @@ makeIndexReal :: Int32 -> [CM.File] -> (Int32, [EntryHeader])
 makeIndexReal a [] = (0, [])
 makeIndexReal a b  =  (len + (fst next), now : (snd next))
   where
-    now = (EntryHeader (stringToId $ CM.name c) a len)
+    now = once c a
     next = makeIndexReal (a+len) (tail b)
     c = head b
-    len = fromIntegral $  L.length $ CM.contents c
+    len = fromIntegral $ L.length $ CM.contents c
 
-saveNames [CM.FileS n c] = (CM.FileS "local mix database.dat"
-                         $ encode $ LocalMixDatabase $
-                         "local mix database.dat" : [n])
-                        : [CM.FileS n c]
-saveNames [CM.FileW i c] = [CM.FileW i c]
+once a off = case a of
+  (CM.FileS n c) -> EntryHeader (stringToId $ n) off len
+    where len = lenf c
+  (CM.FileW i c) -> EntryHeader i off len
+    where len = lenf c
+  where lenf = fromIntegral . L.length
 
-loadNames [CM.FileS n c] = [CM.FileS n c]
-loadNames [CM.FileW i c] = let lmd = head $ filter ((0x54c2d545 ==) . CM.id) [CM.FileW i c]
-                           in  zipWith CM.FileS
-                               (getLMD $ decode $ CM.contents lmd)
-                               [c]
+
+saveNames :: [CM.File] -> [CM.File]
+saveNames ((CM.FileS n c):d) =
+  let names = n : map CM.name d
+      all = (CM.FileS n c):d
+  in (CM.FileS "local mix database.dat"
+      $ encode $ LocalMixDatabase $ "local mix database.dat" : names)
+     : all
+
+saveNames ((CM.FileW i c):d) = (CM.FileW i c):d
+
+loadNames :: [CM.File] -> [CM.File]
+loadNames ((CM.FileS n c):d) = (CM.FileS n c):d
+loadNames ((CM.FileW i c):d) =
+  let content = c : map CM.contents d
+
+      filterLMDn = filter (("local mix datbase.dat" /=) . CM.name)
+      filterLMDi = filter ((0x54c2d545 /=) . CM.id)
+      lmd = head $ filterLMDi $ (CM.FileW i c):d
+  in  filterLMDn $ zipWith CM.FileS
+                   (getLMD $ decode $ CM.contents lmd)
+                   content
+
 
 --
 -- Archive Class Instance
@@ -171,10 +190,8 @@ instance CM.Archive Mix where
                                 $ headToBS x $ entryData m)
                $ entryHeaders m
     where
-      bExtract start stop = L.take (start - stop + 1) . L.drop (start - 1)
-      headToBS entry = bExtract (fromIntegral $ offset $ entry)
-                                (fromIntegral $ size $ entry)
-                                -- do I need to sub1 for start or stop?
+      headToBS entry = L.take   (fromIntegral $ size entry)
+                       . L.drop (fromIntegral $ offset entry)
 
 
 --
