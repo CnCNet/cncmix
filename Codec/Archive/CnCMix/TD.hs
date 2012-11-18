@@ -190,7 +190,27 @@ instance CM.Archive Mix where
 
 
 --
--- Show Metadata
+-- Show Metadata and debug
 --
 
 showMixHeaders a = (masterHeader a , entryHeaders a)
+
+
+-- Only is accurate if the mix has a local mix database as the last file and entry
+-- (Will read local mix database from any position, but only writes it there)
+roundTripTest :: FilePath -> IO ()
+roundTripTest a = do a0 <- L.readFile a
+                     let b0  = decode a0 :: Mix
+                         a1 = encode b0
+                         c0 = CM.archiveToFiles b0
+                         b1 = CM.filesToArchive c0 :: Mix
+                         d0 = loadNames c0
+                         c1 = saveNames d0
+
+                         z  = encode (CM.filesToArchive $ saveNames
+                                      $ loadNames $ CM.archiveToFiles $ b0 :: Mix)
+
+                     print $ a0 == a1
+                     print $ b0 == b1
+                     print $ c0 == c1
+                     print $ a0 == z
