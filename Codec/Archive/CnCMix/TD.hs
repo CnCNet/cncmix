@@ -141,26 +141,21 @@ makeIndexReal :: Int32 -> [CM.File] -> (Int32, [EntryHeader])
 makeIndexReal a [] = (0, [])
 makeIndexReal a b  =  (len + (fst next), now : (snd next))
   where
-    now = once c a
+    now = case top of
+      (CM.FileS n c) -> EntryHeader (stringToId $ n) a len
+      (CM.FileW i c) -> EntryHeader i a len
     next = makeIndexReal (a+len) (tail b)
-    c = head b
-    len = fromIntegral $ L.length $ CM.contents c
-
-once a off = case a of
-  (CM.FileS n c) -> EntryHeader (stringToId $ n) off len
-    where len = lenf c
-  (CM.FileW i c) -> EntryHeader i off len
-    where len = lenf c
-  where lenf = fromIntegral . L.length
-
+    top = head b
+    len = fromIntegral $ L.length $ CM.contents top
 
 saveNames :: [CM.File] -> [CM.File]
 saveNames ((CM.FileS n c):d) =
   let names = n : map CM.name d
       all = (CM.FileS n c):d
-  in (CM.FileS "local mix database.dat"
-      $ encode $ LocalMixDatabase $ "local mix database.dat" : names)
-     : all
+      s2i a = CM.FileW (stringToId $ CM.name a) $ CM.contents a
+  in map s2i
+     $ all ++ [CM.FileS "local mix database.dat"
+               $ encode $ LocalMixDatabase $ names ++ ["local mix database.dat"]]
 
 saveNames ((CM.FileW i c):d) = (CM.FileW i c):d
 
@@ -169,8 +164,8 @@ loadNames ((CM.FileS n c):d) = (CM.FileS n c):d
 loadNames ((CM.FileW i c):d) =
   let content = c : map CM.contents d
 
-      filterLMDn = filter (("local mix datbase.dat" /=) . CM.name)
-      filterLMDi = filter ((0x54c2d545 /=) . CM.id)
+      filterLMDn = filter (("local mix database.dat" /=) . CM.name)
+      filterLMDi = filter ((0x54c2d545 ==) . CM.id)
       lmd = head $ filterLMDi $ (CM.FileW i c):d
   in  filterLMDn $ zipWith CM.FileS
                    (getLMD $ decode $ CM.contents lmd)
