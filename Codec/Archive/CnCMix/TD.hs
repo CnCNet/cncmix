@@ -148,7 +148,25 @@ makeIndexReal a b  =  (len + (fst next), now : (snd next))
     top = head b
     len = fromIntegral $ L.length $ CM.contents top
 
+filesToMixRaw :: [CM.File] -> Mix
+filesToMixRaw x = Mix (makeMaster index) (snd index) (L.concat $ map CM.contents x)
+  where index = (makeIndex x)
+
+mixToFilesRaw :: Mix -> [CM.File]
+mixToFilesRaw m = map (\x -> CM.FileW (Codec.Archive.CnCMix.TD.id x)
+                              $ headToBS x $ entryData m)
+                   $ entryHeaders m
+  where
+    headToBS entry = L.take   (fromIntegral $ size entry)
+                     . L.drop (fromIntegral $ offset entry)
+
+
+--
+-- Using Local Mix Databases
+--
+
 saveNames :: [CM.File] -> [CM.File]
+saveNames ((CM.FileW i c):d) = (CM.FileW i c):d
 saveNames ((CM.FileS n c):d) =
   let names = n : map CM.name d
       all = (CM.FileS n c):d
@@ -157,19 +175,18 @@ saveNames ((CM.FileS n c):d) =
      $ all ++ [CM.FileS "local mix database.dat"
                $ encode $ LocalMixDatabase $ names ++ ["local mix database.dat"]]
 
-saveNames ((CM.FileW i c):d) = (CM.FileW i c):d
-
 loadNames :: [CM.File] -> [CM.File]
 loadNames ((CM.FileS n c):d) = (CM.FileS n c):d
 loadNames ((CM.FileW i c):d) =
   let content = c : map CM.contents d
-
       filterLMDn = filter (("local mix database.dat" /=) . CM.name)
       filterLMDi = filter ((0x54c2d545 ==) . CM.id)
-      lmd = head $ filterLMDi $ (CM.FileW i c):d
-  in  filterLMDn $ zipWith CM.FileS
-                   (getLMD $ decode $ CM.contents lmd)
-                   content
+      lmd = filterLMDi $ (CM.FileW i c):d
+  in case length $ lmd of
+    1 -> filterLMDn $ zipWith CM.FileS
+         (getLMD $ decode $ CM.contents $ head $ lmd)
+         content
+    _ -> (CM.FileW i c):d
 
 
 --
@@ -177,17 +194,9 @@ loadNames ((CM.FileW i c):d) =
 --
 
 instance CM.Archive Mix where
-  filesToArchive x = Mix (makeMaster index) (snd index) (L.concat $ map CM.contents x)
-    where index = (makeIndex x)
+  filesToArchive = filesToMixRaw . saveNames
 
-
-  archiveToFiles m = map (\x -> CM.FileW (Codec.Archive.CnCMix.TD.id x)
-                                $ headToBS x $ entryData m)
-               $ entryHeaders m
-    where
-      headToBS entry = L.take   (fromIntegral $ size entry)
-                       . L.drop (fromIntegral $ offset entry)
-
+  archiveToFiles = loadNames . mixToFilesRaw
 
 --
 -- Show Metadata and debug
@@ -202,8 +211,8 @@ roundTripTest :: FilePath -> IO ()
 roundTripTest a = do a0 <- L.readFile a
                      let b0  = decode a0 :: Mix
                          a1 = encode b0
-                         c0 = CM.archiveToFiles b0
-                         b1 = CM.filesToArchive c0 :: Mix
+                         c0 = mixToFilesRaw b0
+                         b1 = filesToMixRaw c0
                          d0 = loadNames c0
                          c1 = saveNames d0
 

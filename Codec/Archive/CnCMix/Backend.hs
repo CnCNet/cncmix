@@ -38,10 +38,11 @@ readFiles :: [FilePath] -> IO [File]
 readFiles = S.mapM $ Codec.Archive.CnCMix.Backend.readFile
 
 writeFile :: FilePath -> File -> IO ()
-writeFile a c = L.writeFile (a </> name c) $ contents c
+writeFile a (FileS n c) = L.writeFile (a </> n) $ c
+writeFile a (FileW i c) = L.writeFile (a </> showHex i "") $ c
 
-writeFiles :: FilePath -> [File] -> IO [()]
-writeFiles a = S.mapM (Codec.Archive.CnCMix.Backend.writeFile a)
+writeFiles :: FilePath -> [File] -> IO ()
+writeFiles a = S.mapM_ $ Codec.Archive.CnCMix.Backend.writeFile a
 
 --
 -- Archive Type Class
