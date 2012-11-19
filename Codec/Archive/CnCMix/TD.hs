@@ -90,6 +90,7 @@ asciiCharToWord32 c
   | isAscii c = (fromIntegral $ fromEnum $ toUpper c)
   | otherwise = error "non-ascii"
 
+stringToId :: [Char] -> Word32
 stringToId = (word32sToId . stringToWord32s)
 
 
@@ -148,6 +149,7 @@ makeIndexReal a b  =  (len + (fst next), now : (snd next))
     top = head b
     len = fromIntegral $ L.length $ CM.contents top
 
+
 filesToMixRaw :: [CM.File] -> Mix
 filesToMixRaw x = Mix (makeMaster index) (snd index) (L.concat $ map CM.contents x)
   where index = (makeIndex x)
@@ -159,6 +161,14 @@ mixToFilesRaw m = map (\x -> CM.FileW (Codec.Archive.CnCMix.TD.id x)
   where
     headToBS entry = L.take   (fromIntegral $ size entry)
                      . L.drop (fromIntegral $ offset entry)
+
+consFileMixRaw :: CM.File -> Mix -> Mix
+consFileMixRaw (CM.FileW fi fc) (Mix (TopHeader count size) entries contents) =
+  Mix (TopHeader (count+1) (size+fs))
+      (entries ++ [EntryHeader fi size fs])
+      $ L.append contents fc
+  where fs = fromIntegral $ L.length fc
+consFileMixRaw (CM.FileS fs fc) b = consFileMixRaw (CM.FileW (stringToId fs) fc) b
 
 
 --
@@ -180,14 +190,15 @@ loadNames ((CM.FileS n c):d) = (CM.FileS n c):d
 loadNames ((CM.FileW i c):d) =
   let content = c : map CM.contents d
       filterLMDn = filter (("local mix database.dat" /=) . CM.name)
-      filterLMDi = filter ((0x54c2d545 ==) . CM.id)
-      lmd = filterLMDi $ (CM.FileW i c):d
+      lmd = filter ((0x54c2d545 ==) . CM.id) $ (CM.FileW i c):d
   in case length $ lmd of
     1 -> filterLMDn $ zipWith CM.FileS
          (getLMD $ decode $ CM.contents $ head $ lmd)
          content
     _ -> (CM.FileW i c):d
 
+testLMD :: Mix -> Int --[EntryHeader]
+testLMD = length . filter ((0x54c2d545 ==) . Codec.Archive.CnCMix.TD.id) . entryHeaders
 
 --
 -- Archive Class Instance
@@ -197,6 +208,11 @@ instance CM.Archive Mix where
   filesToArchive = filesToMixRaw . saveNames
 
   archiveToFiles = loadNames . mixToFilesRaw
+
+  cons a b = case testLMD $ b of
+    0 -> consFileMixRaw a b
+    _ -> CM.cons a b
+
 
 --
 -- Show Metadata and debug

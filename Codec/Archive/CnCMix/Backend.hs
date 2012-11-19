@@ -63,8 +63,8 @@ class (Binary a) => Archive a where
   tail = filesToArchive . Prelude.tail . archiveToFiles
 
 
-  removeByName :: string -> a
-  removeByID :: word32 -> a
+  removeByName :: a -> String -> a
+  removeById   :: a -> Word32 -> a
 
 showFileNames :: [File] -> [String]
 showFileNames = map (name :: File -> String)
