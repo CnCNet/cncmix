@@ -135,67 +135,67 @@ instance Binary Mix where
 makeMaster x = TopHeader (fromIntegral $ length $ snd x)
                        $ fst x
 
-makeIndex :: [CM.File] -> (Int32, [EntryHeader])
+makeIndex :: [CM.File3] -> (Int32, [EntryHeader])
 makeIndex = makeIndexReal 0
 
-makeIndexReal :: Int32 -> [CM.File] -> (Int32, [EntryHeader])
+makeIndexReal :: Int32 -> [CM.File3] -> (Int32, [EntryHeader])
 makeIndexReal a [] = (0, [])
 makeIndexReal a b  =  (len + (fst next), now : (snd next))
   where
     now = case top of
-      (CM.FileS n c) -> EntryHeader (stringToId $ n) a len
-      (CM.FileW i c) -> EntryHeader i a len
+      (CM.File3 n 0 c) -> EntryHeader (stringToId $ n) a len
+      (CM.File3 _ i c) -> EntryHeader i a len
     next = makeIndexReal (a+len) (tail b)
     top = head b
     len = fromIntegral $ L.length $ CM.contents top
 
 
-filesToMixRaw :: [CM.File] -> Mix
+filesToMixRaw :: [CM.File3] -> Mix
 filesToMixRaw x = Mix (makeMaster index) (snd index) (L.concat $ map CM.contents x)
   where index = (makeIndex x)
 
-mixToFilesRaw :: Mix -> [CM.File]
-mixToFilesRaw m = map (\x -> CM.FileW (Codec.Archive.CnCMix.TD.id x)
+mixToFilesRaw :: Mix -> [CM.File3]
+mixToFilesRaw m = map (\x -> CM.File3 [] (Codec.Archive.CnCMix.TD.id x)
                               $ headToBS x $ entryData m)
                    $ entryHeaders m
   where
     headToBS entry = L.take   (fromIntegral $ size entry)
                      . L.drop (fromIntegral $ offset entry)
 
-consFileMixRaw :: CM.File -> Mix -> Mix
-consFileMixRaw (CM.FileW fi fc) (Mix (TopHeader count size) entries contents) =
+consFileMixRaw :: CM.File3 -> Mix -> Mix
+consFileMixRaw (CM.File3 [] fi fc) (Mix (TopHeader count size) entries contents) =
   Mix (TopHeader (count+1) (size+fs))
       (entries ++ [EntryHeader fi size fs])
       $ L.append contents fc
   where fs = fromIntegral $ L.length fc
-consFileMixRaw (CM.FileS fs fc) b = consFileMixRaw (CM.FileW (stringToId fs) fc) b
+consFileMixRaw (CM.File3 fs _ fc) b = consFileMixRaw (CM.File3 [] (stringToId fs) fc) b
 
 
 --
 -- Using Local Mix Databases
 --
 
-saveNames :: [CM.File] -> [CM.File]
-saveNames ((CM.FileW i c):d) = (CM.FileW i c):d
-saveNames ((CM.FileS n c):d) =
+saveNames :: [CM.File3] -> [CM.File3]
+saveNames ((CM.File3 [] i c):d) = (CM.File3 [] i c):d
+saveNames ((CM.File3 n i c):d) =
   let names = n : map CM.name d
-      all = (CM.FileS n c):d
-      s2i a = CM.FileW (stringToId $ CM.name a) $ CM.contents a
-  in map s2i
-     $ all ++ [CM.FileS "local mix database.dat"
+      all = (CM.File3 [] i c): map (\(CM.File3 _ i c) -> CM.File3 [] i c) d
+  in all ++ [CM.File3 [] 0x54c2d545
                $ encode $ LocalMixDatabase $ names ++ ["local mix database.dat"]]
 
-loadNames :: [CM.File] -> [CM.File]
-loadNames ((CM.FileS n c):d) = (CM.FileS n c):d
-loadNames ((CM.FileW i c):d) =
+loadNames :: [CM.File3] -> [CM.File3]
+loadNames ((CM.File3 (n:ns) i c):d) = (CM.File3 (n:ns) i c):d
+loadNames ((CM.File3 [] i c):d) =
   let content = c : map CM.contents d
+      ids = i : map CM.id d
       filterLMDn = filter (("local mix database.dat" /=) . CM.name)
-      lmd = filter ((0x54c2d545 ==) . CM.id) $ (CM.FileW i c):d
+      lmd = filter ((0x54c2d545 ==) . CM.id) $ (CM.File3 [] i c):d
   in case length $ lmd of
-    1 -> filterLMDn $ zipWith CM.FileS
+    1 -> filterLMDn $ zipWith3 CM.File3
          (getLMD $ decode $ CM.contents $ head $ lmd)
+         ids
          content
-    _ -> (CM.FileW i c):d
+    _ -> (CM.File3 [] i c):d
 
 testLMD :: Mix -> Int --[EntryHeader]
 testLMD = length . filter ((0x54c2d545 ==) . Codec.Archive.CnCMix.TD.id) . entryHeaders
@@ -213,7 +213,6 @@ instance CM.Archive Mix where
     0 -> consFileMixRaw a b
     _ -> CM.cons a b
 
-
 --
 -- Show Metadata and debug
 --
@@ -224,18 +223,33 @@ showMixHeaders a = (masterHeader a , entryHeaders a)
 -- Only is accurate if the mix has a local mix database as the last file and entry
 -- (Will read local mix database from any position, but only writes it there)
 roundTripTest :: FilePath -> IO ()
-roundTripTest a = do a0 <- L.readFile a
-                     let b0  = decode a0 :: Mix
-                         a1 = encode b0
-                         c0 = mixToFilesRaw b0
-                         b1 = filesToMixRaw c0
-                         d0 = loadNames c0
-                         c1 = saveNames d0
+roundTripTest a =
+  do a0 <- L.readFile a
+     let b0  = decode a0 :: Mix
+         a1 = encode b0
+         c0 = mixToFilesRaw b0
+         b1 = filesToMixRaw c0
+         d0 = loadNames c0
+         c1 = saveNames d0
 
-                         z  = encode (CM.filesToArchive $ saveNames
-                                      $ loadNames $ CM.archiveToFiles $ b0 :: Mix)
+         z  = encode (CM.filesToArchive $ saveNames
+                      $ loadNames $ CM.archiveToFiles $ b0 :: Mix)
 
-                     print $ a0 == a1
-                     print $ b0 == b1
-                     print $ c0 == c1
-                     print $ a0 == z
+         testElseDump b1 b2 s =
+           if b1 == b2
+           then print True
+           else do print False
+                   --L.writeFile (a ++ s1) b1
+                   L.writeFile (a ++ s) b2
+
+         testElsePrint b1 b2 =
+           if b1 == b2
+           then print True
+           else do print False
+                   print b1
+                   print b2
+
+     testElseDump a0 a1 "-prime"
+     testElsePrint b0 b1
+     testElsePrint c0 c1
+     testElseDump a0 z "-prime"

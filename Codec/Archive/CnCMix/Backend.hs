@@ -23,48 +23,55 @@ import Data.Binary.Put
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
-data File = FileS { name :: String, contents :: L.ByteString }
-          | FileW { id   :: Word32, contents :: L.ByteString }
-          deriving (Show, Read, Eq)
+data File3 = File3 { name     :: String
+                   , id       :: Word32
+                   , contents :: L.ByteString }
+           deriving (Show, Read, Eq)
+
 
 --
 -- Generic File Operators
 --
 
-readFile :: FilePath -> IO File
-readFile c = S.liftM2 FileS (return $ takeFileName c) $ L.readFile c
+readFile3 :: (FilePath -> Word32) -> FilePath -> IO File3
+readFile3 f p = (return . File3 p (f p)) =<< L.readFile p
+  where shortname = takeFileName p
 
-readFiles :: [FilePath] -> IO [File]
-readFiles = S.mapM $ Codec.Archive.CnCMix.Backend.readFile
+readFile3s :: (FilePath -> Word32) -> [FilePath] -> IO [File3]
+readFile3s f = S.mapM $ readFile3 f
 
-writeFile :: FilePath -> File -> IO ()
-writeFile a (FileS n c) = L.writeFile (a </> n) $ c
-writeFile a (FileW i c) = L.writeFile (a </> showHex i "") $ c
+writeFile3 :: FilePath -> File3 -> IO ()
+writeFile3 p (File3 n _ c) = L.writeFile (p </> n) $ c
 
-writeFiles :: FilePath -> [File] -> IO ()
-writeFiles a = S.mapM_ $ Codec.Archive.CnCMix.Backend.writeFile a
+writeFile3s :: FilePath -> [File3] -> IO ()
+writeFile3s = S.mapM_ . writeFile3
+
+removeFile3ByName :: [File3] -> String -> [File3]
+removeFile3ByName fs n = filter ((n ==) . name) fs
+
+removeFile3ById :: [File3] -> Word32 -> [File3]
+removeFile3ById fs i = filter ((i ==) . Codec.Archive.CnCMix.Backend.id) fs
+
 
 --
 -- Archive Type Class
 --
+
 class (Binary a) => Archive a where
   -- | Creates a TAR archive containing a number of files
-  filesToArchive :: [File] -> a
-  archiveToFiles :: a -> [File]
+  filesToArchive :: [File3] -> a
+  archiveToFiles :: a -> [File3]
 
 
-  cons :: File -> a -> a
+  cons :: File3 -> a -> a
   cons f = filesToArchive . (f :) . archiveToFiles
 
-  head :: a -> File
+  head :: a -> File3
   head = Prelude.head . archiveToFiles
 
   tail :: a -> a
   tail = filesToArchive . Prelude.tail . archiveToFiles
 
 
-  removeByName :: a -> String -> a
-  removeById   :: a -> Word32 -> a
-
-showFileNames :: [File] -> [String]
-showFileNames = map (name :: File -> String)
+showFileNames :: [File3] -> [String]
+showFileNames = map (name :: File3 -> String)

@@ -66,11 +66,11 @@ dBinaryToMix = autoDispatch decode {- decode decode decode decode -}
 
 dFilesToMix t = manualDispatch t filesToArchive {- decode decode decode decode -}
 
-g = (filesToArchive :: [File] -> TD.Mix)
-h = (archiveToFiles :: TD.Mix -> [File])
+g = (filesToArchive :: [File3] -> TD.Mix)
+h = (archiveToFiles :: TD.Mix -> [File3])
 
 --filesMixIO :: FilePath -> [FilePath] -> IO ()
-filesMixIO a = ((S.liftM g) . readFiles) S.>=> (encodeFile a)
+filesMixIO a = ((S.liftM g) . (readFile3s TD.stringToId)) S.>=> (encodeFile a)
 
 --mixToFilesIO :: FilePath -> FilePath -> IO [()]
-mixToFilesIO a = ((S.liftM h) . decodeFile) S.>=> (writeFiles a)
+mixToFilesIO a = ((S.liftM h) . decodeFile) S.>=> (writeFile3s a)
