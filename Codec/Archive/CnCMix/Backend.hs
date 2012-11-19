@@ -10,6 +10,7 @@ import Data.Word
 import Data.Int
 import Data.Bits
 import Data.Char
+import Data.List
 
 import Numeric
 
@@ -46,12 +47,15 @@ writeFile3 p (File3 n _ c) = L.writeFile (p </> n) $ c
 writeFile3s :: FilePath -> [File3] -> IO ()
 writeFile3s = S.mapM_ . writeFile3
 
-removeFile3ByName :: [File3] -> String -> [File3]
-removeFile3ByName fs n = filter ((n ==) . name) fs
+removeFile3 :: [File3] -> File3 -> [File3]
+removeFile3 fs new@(File3 nn ni _) = filter (detectFile3 nn ni) fs
 
-removeFile3ById :: [File3] -> Word32 -> [File3]
-removeFile3ById fs i = filter ((i ==) . Codec.Archive.CnCMix.Backend.id) fs
+replaceFile3 :: (File3 -> File3 -> File3) -> [File3] -> File3 -> [File3]
+replaceFile3 comb fs new@(File3 nn ni _) = (comb new $ Prelude.head $ snd split) : fst split
+  where split = partition (detectFile3 nn ni) fs
 
+detectFile3 n i x = (i == Codec.Archive.CnCMix.Backend.id x)
+                    || (n == name x)
 
 --
 -- Archive Type Class

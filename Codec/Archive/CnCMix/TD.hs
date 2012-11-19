@@ -7,6 +7,7 @@ import Data.Word
 import Data.Int
 import Data.Bits
 import Data.Char
+import Data.List
 
 import Numeric
 
@@ -93,7 +94,20 @@ asciiCharToWord32 c
 stringToId :: [Char] -> Word32
 stringToId = (word32sToId . stringToWord32s)
 
--- The Key to it all!
+
+--
+-- TD's File3 functions
+--
+
+readFile3 :: FilePath -> IO CM.File3
+readFile3 = CM.readFile3 updateFile3
+
+readFile3s :: [FilePath] -> IO [CM.File3]
+readFile3s = CM.readFile3s updateFile3
+
+replaceFile3 :: [CM.File3] -> CM.File3 -> [CM.File3]
+replaceFile3 = CM.replaceFile3 combineFile3
+
 updateFile3 :: CM.File3 -> CM.File3
 updateFile3 (CM.File3 [] i c) = (CM.File3 [] i c)
 updateFile3 (CM.File3 ('0':'x':s) i c) = case i of
@@ -107,15 +121,16 @@ updateFile3 (CM.File3 s@(_:_) i c) = case i of
   _  -> error "id does not match filename"
   where i' = stringToId s
 
---
--- TD's File3 functions
---
-
-readFile3 :: FilePath -> IO CM.File3
-readFile3 = CM.readFile3 updateFile3
-
-readFile3s :: [FilePath] -> IO [CM.File3]
-readFile3s = CM.readFile3s updateFile3
+combineFile3 :: CM.File3 -> CM.File3 -> CM.File3
+combineFile3 (CM.File3 n1 i1 c1) (CM.File3 n2 i2 c2) = CM.File3 n' i' c'
+  where n' = combine n1 n2 []
+        i' = combine i1 i2 0
+        c' = combine c1 c2 L.empty
+        combine a b base
+          | a == base = b
+          | b == base = a
+          | a == b    = a
+          | otherwise = error "conflict when combining File3s"
 
 
 --
