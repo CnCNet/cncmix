@@ -30,13 +30,13 @@ instance Binary LocalMixDatabase where
   get = do skip 32 --Static info
            skip 16 --total size
            count <- getWord32le
-           S.liftM LocalMixDatabase $ S.replicateM (fromIntegral count)
-             $ S.liftM C.unpack getLazyByteStringNul
+           return . LocalMixDatabase . S.replicateM (fromIntegral count)
+             . C.unpack =<< getLazyByteStringNul
 
   put (LocalMixDatabase fileNames) =
     do putLazyByteString $ C.pack "XCC by Olaf van der Spek"
-       S.mapM putWord8 (0x1A : 0x04 : 0x17 : 0x27 : 0x10 : 0x19 : 0x80 : 0x00 : [])
+       S.mapM putWord8 [0x1A, 0x04, 0x17, 0x27, 0x10, 0x19, 0x80, 0x00] --a random constant
        putWord64le $ fromIntegral $ lengthLMD fileNames --size of database
-       S.replicateM_ 8 $ putWord8 0
+       S.replicateM_ 8 $ putWord8 0 --padding
        putWord32le $ fromIntegral $ length fileNames --number of strings
        S.mapM_ putAsCString fileNames --filenames themselves
