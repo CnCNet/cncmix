@@ -33,11 +33,11 @@ data File3 = File3 { name     :: String
 -- Generic File Operators
 --
 
-readFile3 :: (FilePath -> Word32) -> FilePath -> IO File3
-readFile3 f p = (return . File3 p (f p)) =<< L.readFile p
+readFile3 :: (File3 -> File3) -> FilePath -> IO File3
+readFile3 f p = return . f . File3 shortname 0 =<< L.readFile p
   where shortname = takeFileName p
 
-readFile3s :: (FilePath -> Word32) -> [FilePath] -> IO [File3]
+readFile3s :: (File3 -> File3) -> [FilePath] -> IO [File3]
 readFile3s f = S.mapM $ readFile3 f
 
 writeFile3 :: FilePath -> File3 -> IO ()

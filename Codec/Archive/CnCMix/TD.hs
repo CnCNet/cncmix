@@ -93,6 +93,30 @@ asciiCharToWord32 c
 stringToId :: [Char] -> Word32
 stringToId = (word32sToId . stringToWord32s)
 
+-- The Key to it all!
+updateFile3 :: CM.File3 -> CM.File3
+updateFile3 (CM.File3 [] i c) = (CM.File3 [] i c)
+updateFile3 (CM.File3 ('0':'x':s) i c) = case i of
+  0  -> CM.File3 [] i' c
+  i' -> CM.File3 [] i' c
+  _  -> error "id does not match filename"
+  where i' = fst $ Prelude.head $ readHex s
+updateFile3 (CM.File3 s@(_:_) i c) = case i of
+  0  -> CM.File3 s i' c
+  i' -> CM.File3 s i' c
+  _  -> error "id does not match filename"
+  where i' = stringToId s
+
+--
+-- TD's File3 functions
+--
+
+readFile3 :: FilePath -> IO CM.File3
+readFile3 = CM.readFile3 updateFile3
+
+readFile3s :: [FilePath] -> IO [CM.File3]
+readFile3s = CM.readFile3s updateFile3
+
 
 --
 -- decode/encode Mix
@@ -168,7 +192,7 @@ consFileMixRaw (CM.File3 [] fi fc) (Mix (TopHeader count size) entries contents)
       (entries ++ [EntryHeader fi size fs])
       $ L.append contents fc
   where fs = fromIntegral $ L.length fc
-consFileMixRaw (CM.File3 fs _ fc) b = consFileMixRaw (CM.File3 [] (stringToId fs) fc) b
+consFileMixRaw f@(CM.File3 (_:_) _ _) b = consFileMixRaw (updateFile3 f) b
 
 
 --
@@ -176,29 +200,30 @@ consFileMixRaw (CM.File3 fs _ fc) b = consFileMixRaw (CM.File3 [] (stringToId fs
 --
 
 saveNames :: [CM.File3] -> [CM.File3]
-saveNames ((CM.File3 [] i c):d) = (CM.File3 [] i c):d
-saveNames ((CM.File3 n i c):d) =
+saveNames fs@((CM.File3 [] _ _):_) = fs
+saveNames ((CM.File3 n@(_:_) i c):d) =
   let names = n : map CM.name d
       all = (CM.File3 [] i c): map (\(CM.File3 _ i c) -> CM.File3 [] i c) d
   in all ++ [CM.File3 [] 0x54c2d545
                $ encode $ LocalMixDatabase $ names ++ ["local mix database.dat"]]
 
 loadNames :: [CM.File3] -> [CM.File3]
-loadNames ((CM.File3 (n:ns) i c):d) = (CM.File3 (n:ns) i c):d
-loadNames ((CM.File3 [] i c):d) =
-  let content = c : map CM.contents d
-      ids = i : map CM.id d
-      filterLMDn = filter (("local mix database.dat" /=) . CM.name)
-      lmd = filter ((0x54c2d545 ==) . CM.id) $ (CM.File3 [] i c):d
+loadNames fs =
+  let content = map CM.contents fs
+      ids = map CM.id fs
+      isLMD x = 0x54c2d545 /= CM.id x
+                || "local mix database.dat" /= CM.name x
+      lmd = filter isLMD $ fs
   in case length $ lmd of
-    1 -> filterLMDn $ zipWith3 CM.File3
+    1 -> filter (not . isLMD) $ zipWith3 CM.File3
          (getLMD $ decode $ CM.contents $ head $ lmd)
          ids
          content
-    _ -> (CM.File3 [] i c):d
+    _ -> fs
 
 testLMD :: Mix -> Int --[EntryHeader]
 testLMD = length . filter ((0x54c2d545 ==) . Codec.Archive.CnCMix.TD.id) . entryHeaders
+
 
 --
 -- Archive Class Instance
@@ -212,6 +237,7 @@ instance CM.Archive Mix where
   cons a b = case testLMD $ b of
     0 -> consFileMixRaw a b
     _ -> CM.cons a b
+
 
 --
 -- Show Metadata and debug

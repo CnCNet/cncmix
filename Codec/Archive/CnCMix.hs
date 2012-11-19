@@ -70,7 +70,7 @@ g = (filesToArchive :: [File3] -> TD.Mix)
 h = (archiveToFiles :: TD.Mix -> [File3])
 
 --filesMixIO :: FilePath -> [FilePath] -> IO ()
-filesMixIO a = ((S.liftM g) . (readFile3s TD.stringToId)) S.>=> (encodeFile a)
+filesMixIO a = ((S.liftM g) . TD.readFile3s) S.>=> (encodeFile a)
 
 --mixToFilesIO :: FilePath -> FilePath -> IO [()]
 mixToFilesIO a = ((S.liftM h) . decodeFile) S.>=> (writeFile3s a)
