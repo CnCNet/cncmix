@@ -141,8 +141,8 @@ combineTestFile3 (CM.File3 n1 i1 c1) (CM.File3 n2 i2 c2) =
           | otherwise = False
 
 mergeFile3s :: [CM.File3] -> [CM.File3] -> [CM.File3]
-mergeFiles [] k = k
-mergeFiles _ [] = []
+mergeFile3s [] k = k
+mergeFile3s _ [] = []
 mergeFile3s merge keep = case combineTestFile3 mH kH of
   True  -> combineFile3 mH kH : mergeFile3s mT kT
   False -> mergeFile3s mT keep
@@ -231,11 +231,13 @@ consFileMixRaw f@(CM.File3 (_:_) _ _) b = consFileMixRaw (updateFile3 f) b
 --
 
 saveNames :: [CM.File3] -> [CM.File3]
-saveNames fs =
-  let fs'    = filter (not . isLMD) fs
-      names = map CM.name fs'
-  in (CM.File3 [] 0x54c2d545 $ encode $ LocalMixDatabase $ "local mix database.dat" : filter (==[]) names)
-     : (map (\(CM.File3 _ i c) -> CM.File3 [] i c) fs')
+saveNames fs
+  | null $ filter (\(CM.File3 n _ _) -> not $ null n) fs = fs
+  | otherwise =
+    (CM.File3 [] 0x54c2d545 $ encode $ LocalMixDatabase $ "local mix database.dat" : filter (/=[]) names)
+    : (map (\(CM.File3 _ i c) -> CM.File3 [] i c) fs')
+  where fs'    = filter (not . isLMD) fs
+        names  = map CM.name fs'
 
 loadNames :: [CM.File3] -> [CM.File3]
 loadNames fs =
@@ -274,7 +276,7 @@ instance CM.Archive Mix where
 showMixHeaders a = (masterHeader a , entryHeaders a)
 
 
--- Only is accurate if the mix has a local mix database as the last file and entry
+-- Only is accurate if the mix has a local mix database as the FIRST file and entry
 -- (Will read local mix database from any position, but only writes it there)
 roundTripTest :: FilePath -> IO ()
 roundTripTest a =
@@ -284,8 +286,7 @@ roundTripTest a =
          c1 = saveNames d0;     d0 = loadNames c0
 
          a2 = encode b2;        b2 = filesToMixRaw c1
-         z  = encode (CM.filesToArchive $ saveNames
-                      $ loadNames $ CM.archiveToFiles $ b0 :: Mix)
+         z  = encode (CM.filesToArchive $ CM.archiveToFiles $ b0 :: Mix)
 
          testElseDump b1 b2 s =
            if b1 == b2
@@ -301,10 +302,10 @@ roundTripTest a =
                    print b1
                    print b2
 
-     testElseDump a0 a1 "-prime"
+     testElseDump a0 a1 "-1"
      testElsePrint b0 b1
      testElsePrint c0 c1
 
-     --testElseDump a0 a2 "-prime"
-     --testElsePrint b0 b2
-     --testElseDump a0 z "-prime"
+     testElseDump a0 a2 "-2"
+     testElsePrint b0 b2
+     testElseDump a0 z "-3"
