@@ -7,7 +7,6 @@ import Data.Word
 import Data.Int
 import Data.Bits
 import Data.Char
-import Data.List
 
 import Numeric
 
@@ -132,6 +131,23 @@ combineFile3 (CM.File3 n1 i1 c1) (CM.File3 n2 i2 c2) = CM.File3 n' i' c'
           | a == b    = a
           | otherwise = error "conflict when combining File3s"
 
+combineTestFile3 :: CM.File3 -> CM.File3 -> Bool
+combineTestFile3 (CM.File3 n1 i1 c1) (CM.File3 n2 i2 c2) =
+   combine n1 n2 [] && combine i1 i2 0 && combine c1 c2 L.empty
+   where combine a b base
+          | a == base = True
+          | b == base = True
+          | a == b    = True
+          | otherwise = False
+
+mergeFile3s :: [CM.File3] -> [CM.File3] -> [CM.File3]
+mergeFiles [] k = k
+mergeFiles _ [] = []
+mergeFile3s merge keep = case combineTestFile3 mH kH of
+  True  -> combineFile3 mH kH : mergeFile3s mT kT
+  False -> mergeFile3s mT keep
+  where mH = head merge; mT = tail merge
+        kH = head keep;  kT = tail keep
 
 --
 -- decode/encode Mix
@@ -215,26 +231,23 @@ consFileMixRaw f@(CM.File3 (_:_) _ _) b = consFileMixRaw (updateFile3 f) b
 --
 
 saveNames :: [CM.File3] -> [CM.File3]
-saveNames fs@((CM.File3 [] _ _):_) = fs
-saveNames ((CM.File3 n@(_:_) i c):d) =
-  let names = n : map CM.name d
-      all = (CM.File3 [] i c): map (\(CM.File3 _ i c) -> CM.File3 [] i c) d
-  in all ++ [CM.File3 [] 0x54c2d545
-               $ encode $ LocalMixDatabase $ names ++ ["local mix database.dat"]]
+saveNames fs =
+  let fs'    = filter (not . isLMD) fs
+      names = map CM.name fs'
+  in (CM.File3 [] 0x54c2d545 $ encode $ LocalMixDatabase $ "local mix database.dat" : filter (==[]) names)
+     : (map (\(CM.File3 _ i c) -> CM.File3 [] i c) fs')
 
 loadNames :: [CM.File3] -> [CM.File3]
 loadNames fs =
-  let content = map CM.contents fs
-      ids = map CM.id fs
-      isLMD x = 0x54c2d545 /= CM.id x
-                || "local mix database.dat" /= CM.name x
-      lmd = filter isLMD $ fs
+  let lmd     = filter isLMD fs
+      dummies = map (\x -> CM.File3 x 0 L.empty)
+                $ getLMD $ decode $ CM.contents $ head $ lmd
   in case length $ lmd of
-    1 -> filter (not . isLMD) $ zipWith3 CM.File3
-         (getLMD $ decode $ CM.contents $ head $ lmd)
-         ids
-         content
+    1 -> filter (not . isLMD) $ mergeFile3s dummies fs
     _ -> fs
+
+isLMD :: CM.File3 -> Bool
+isLMD = CM.detectFile3 "local mix database.dat" 0x54c2d545
 
 testLMD :: Mix -> Int --[EntryHeader]
 testLMD = length . filter ((0x54c2d545 ==) . Codec.Archive.CnCMix.TD.id) . entryHeaders
@@ -266,13 +279,11 @@ showMixHeaders a = (masterHeader a , entryHeaders a)
 roundTripTest :: FilePath -> IO ()
 roundTripTest a =
   do a0 <- L.readFile a
-     let b0  = decode a0 :: Mix
-         a1 = encode b0
-         c0 = mixToFilesRaw b0
-         b1 = filesToMixRaw c0
-         d0 = loadNames c0
-         c1 = saveNames d0
+     let a1 = encode b0;        b0 = decode a0 :: Mix
+         b1 = filesToMixRaw c0; c0 = mixToFilesRaw b0
+         c1 = saveNames d0;     d0 = loadNames c0
 
+         a2 = encode b2;        b2 = filesToMixRaw c1
          z  = encode (CM.filesToArchive $ saveNames
                       $ loadNames $ CM.archiveToFiles $ b0 :: Mix)
 
@@ -293,4 +304,7 @@ roundTripTest a =
      testElseDump a0 a1 "-prime"
      testElsePrint b0 b1
      testElsePrint c0 c1
-     testElseDump a0 z "-prime"
+
+     --testElseDump a0 a2 "-prime"
+     --testElsePrint b0 b2
+     --testElseDump a0 z "-prime"

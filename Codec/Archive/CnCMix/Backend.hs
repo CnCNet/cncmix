@@ -54,6 +54,7 @@ replaceFile3 :: (File3 -> File3 -> File3) -> [File3] -> File3 -> [File3]
 replaceFile3 comb fs new@(File3 nn ni _) = (comb new $ Prelude.head $ snd split) : fst split
   where split = partition (detectFile3 nn ni) fs
 
+detectFile3 :: String -> Word32 -> File3 -> Bool
 detectFile3 n i x = (i == Codec.Archive.CnCMix.Backend.id x)
                     || (n == name x)
 
