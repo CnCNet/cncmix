@@ -8,11 +8,11 @@ module Codec.Archive.CnCMix where
 
 import Codec.Archive.CnCMix.Backend
 
-import qualified Codec.Archive.CnCMix.TD  as TD
---import qualified Codec.Archive.CnCMix.RA  as RA
---import qualified Codec.Archive.CnCMix.TS  as TS
---import qualified Codec.Archive.CnCMix.RA2 as RA2
---import qualified Codec.Archive.CnCMix.RG  as RG
+import qualified Codec.Archive.CnCMix.TiberianDawn as TD
+--import qualified Codec.Archive.CnCMix.RedAlert     as RA
+--import qualified Codec.Archive.CnCMix.TiberianSun  as TS
+--import qualified Codec.Archive.CnCMix.RedAlert2    as RA2
+--import qualified Codec.Archive.CnCMix.Renegade     as Rg
 
 
 import Data.Word

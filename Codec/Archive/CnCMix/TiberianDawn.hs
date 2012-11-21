@@ -1,4 +1,4 @@
-module Codec.Archive.CnCMix.TD where
+module Codec.Archive.CnCMix.TiberianDawn where
 
 import qualified Codec.Archive.CnCMix.Backend as CM
 import Codec.Archive.CnCMix.LocalMixDatabase
@@ -182,7 +182,7 @@ filesToMixRaw x = Mix (makeMaster index) (snd index) (L.concat $ map CM.contents
   where index = (makeIndex x)
 
 mixToFilesRaw :: Mix -> [CM.File3]
-mixToFilesRaw m = map (\x -> CM.File3 [] (Codec.Archive.CnCMix.TD.id x)
+mixToFilesRaw m = map (\x -> CM.File3 [] (Codec.Archive.CnCMix.TiberianDawn.id x)
                               $ headToBS x $ entryData m)
                    $ entryHeaders m
   where
@@ -224,7 +224,7 @@ isLMD :: CM.File3 -> Bool
 isLMD = CM.detectFile3 "local mix database.dat" 0x54c2d545
 
 testLMD :: Mix -> Int --[EntryHeader]
-testLMD = length . filter ((0x54c2d545 ==) . Codec.Archive.CnCMix.TD.id) . entryHeaders
+testLMD = length . filter ((0x54c2d545 ==) . Codec.Archive.CnCMix.TiberianDawn.id) . entryHeaders
 
 
 --
