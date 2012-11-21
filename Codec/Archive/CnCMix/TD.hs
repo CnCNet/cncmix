@@ -105,49 +105,21 @@ readFile3s :: [FilePath] -> IO [CM.File3]
 readFile3s = CM.readFile3s updateFile3
 
 replaceFile3 :: [CM.File3] -> CM.File3 -> [CM.File3]
-replaceFile3 = CM.replaceFile3 combineFile3
+replaceFile3 = CM.replaceFile3 CM.combineFile3
 
 updateFile3 :: CM.File3 -> CM.File3
 updateFile3 (CM.File3 [] i c) = (CM.File3 [] i c)
-updateFile3 (CM.File3 ('0':'x':s) i c) = case i of
-  0  -> CM.File3 [] i' c
-  i' -> CM.File3 [] i' c
-  _  -> error "id does not match filename"
+updateFile3 (CM.File3 ('0':'x':s) i c)
+  | i == 0    = CM.File3 [] i' c
+  | i == i'   = CM.File3 [] i' c
+  | otherwise = error "id does not match filename"
   where i' = fst $ Prelude.head $ readHex s
-updateFile3 (CM.File3 s@(_:_) i c) = case i of
-  0  -> CM.File3 s i' c
-  i' -> CM.File3 s i' c
-  _  -> error "id does not match filename"
+updateFile3 (CM.File3 s@(_:_) i c)
+  | i == 0    = CM.File3 s i' c
+  | i == i'   = CM.File3 s i' c
+  | otherwise = error "id does not match filename"
   where i' = stringToId s
 
-combineFile3 :: CM.File3 -> CM.File3 -> CM.File3
-combineFile3 (CM.File3 n1 i1 c1) (CM.File3 n2 i2 c2) = CM.File3 n' i' c'
-  where n' = combine n1 n2 []
-        i' = combine i1 i2 0
-        c' = combine c1 c2 L.empty
-        combine a b base
-          | a == base = b
-          | b == base = a
-          | a == b    = a
-          | otherwise = error "conflict when combining File3s"
-
-combineTestFile3 :: CM.File3 -> CM.File3 -> Bool
-combineTestFile3 (CM.File3 n1 i1 c1) (CM.File3 n2 i2 c2) =
-   combine n1 n2 [] && combine i1 i2 0 && combine c1 c2 L.empty
-   where combine a b base
-          | a == base = True
-          | b == base = True
-          | a == b    = True
-          | otherwise = False
-
-mergeFile3s :: [CM.File3] -> [CM.File3] -> [CM.File3]
-mergeFile3s [] k = k
-mergeFile3s _ [] = []
-mergeFile3s merge keep = case combineTestFile3 mH kH of
-  True  -> combineFile3 mH kH : mergeFile3s mT kT
-  False -> mergeFile3s mT keep
-  where mH = head merge; mT = tail merge
-        kH = head keep;  kT = tail keep
 
 --
 -- decode/encode Mix
@@ -245,7 +217,7 @@ loadNames fs =
       dummies = map (\x -> CM.File3 x 0 L.empty)
                 $ getLMD $ decode $ CM.contents $ head $ lmd
   in case length $ lmd of
-    1 -> filter (not . isLMD) $ mergeFile3s dummies fs
+    1 -> filter (not . isLMD) $ CM.mergeFile3s dummies fs
     _ -> fs
 
 isLMD :: CM.File3 -> Bool
