@@ -11,6 +11,7 @@ import Data.Int
 import Data.Bits
 import Data.Char
 import Data.List
+import Data.Maybe
 
 import Numeric
 
@@ -31,7 +32,7 @@ data File3 = File3 { name     :: String
 
 
 --
--- Generic File Operators
+-- Porcelain File Operators
 --
 
 readFile3 :: (File3 -> File3) -> FilePath -> IO File3
@@ -47,45 +48,61 @@ writeFile3 p (File3 n _ c) = L.writeFile (p </> n) $ c
 writeFile3s :: FilePath -> [File3] -> IO ()
 writeFile3s = S.mapM_ . writeFile3
 
-removeFile3 :: [File3] -> File3 -> [File3]
-removeFile3 fs new@(File3 nn ni _) = filter (detectFile3 nn ni) fs
+removeFile3s :: File3 -> [File3] -> [File3]
+removeFile3s new@(File3 nn ni _) fs = filter (detectFile3 nn ni) fs
 
-replaceFile3 :: (File3 -> File3 -> File3) -> [File3] -> File3 -> [File3]
-replaceFile3 comb fs new@(File3 nn ni _) = (comb new $ Prelude.head $ snd split) : fst split
-  where split = partition (detectFile3 nn ni) fs
+mergeFile3s ::[File3] -> [File3] -> [File3]
+mergeFile3s = combineFile3sGeneric combineDestructiveFile3 True
+
+mergeFile3 :: File3 -> [File3] -> [File3]
+mergeFile3 a = mergeFile3s [a]
 
 detectFile3 :: String -> Word32 -> File3 -> Bool
 detectFile3 n i x = (i == Codec.Archive.CnCMix.Backend.id x)
                     || (n == name x)
 
-combineFile3 :: File3 -> File3 -> File3
-combineFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) = File3 n' i' c'
-  where n' = combine n1 n2 []
-        i' = combine i1 i2 0
-        c' = combine c1 c2 L.empty
-        combine a b base
-          | a == base = b
-          | b == base = a
-          | a == b    = a
-          | otherwise = error "conflict when combining File3s"
+updateMetadataFile3s = combineFile3sGeneric combineSafeFile3 False
 
-combineTestFile3 :: File3 -> File3 -> Bool
-combineTestFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
-   combine n1 n2 [] && combine i1 i2 0 && combine c1 c2 L.empty
-   where combine a b base
-          | a == base = True
-          | b == base = True
-          | a == b    = True
-          | otherwise = False
+--
+-- Plumbing File Operators
+--
 
-mergeFile3s :: [File3] -> [File3] -> [File3]
-mergeFile3s [] k = k
-mergeFile3s _ [] = []
-mergeFile3s merge keep = case combineTestFile3 mH kH of
-  True  -> combineFile3 mH kH : mergeFile3s mT kT
-  False -> mergeFile3s mT keep
-  where mH = head merge; mT = tail merge
-        kH = head keep;  kT = tail keep
+combineDestructiveFile3 :: File3 -> File3 -> Maybe File3
+combineDestructiveFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
+  case results of
+    (Just a, Just b) -> Just $ File3 a b c1
+    (_, _)           -> Nothing
+  where results = (cF n1 n2 [], cF i1 i2 0)
+        cF a b base
+          | a == base = Just b
+          | b == base = Just a
+          | a == b    = Just a
+          | otherwise = Just a
+
+combineSafeFile3 :: File3 -> File3 -> Maybe File3
+combineSafeFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
+  case results of
+    (Just a, Just b, Just c) -> Just $ File3 a b c
+    (_, _, _)                -> Nothing
+  where results = (cF n1 n2 [], cF i1 i2 0, cF c1 c2 L.empty)
+        cF a b base
+          | a == base = Just b
+          | b == base = Just a
+          | a == b    = Just a
+          | otherwise = Nothing
+
+combineFile3sGeneric :: (File3 -> File3 -> Maybe File3)
+                        -> Bool -> [File3] -> [File3] -> [File3]
+combineFile3sGeneric _ True  k  [] = k
+combineFile3sGeneric _ False _  [] = []
+combineFile3sGeneric _ _     [] k  = k
+combineFile3sGeneric f b meta real = case partition (isJust . f' hR) meta of
+  (x@(_:_), y) -> (foldl (\a -> g . f' a) hR x) : combineFile3sGeneric f b y tR
+  ([], (_:_))  -> hR : combineFile3sGeneric f b meta tR
+  where f' = flip f;    g = \(Just a) -> a
+        hM = head meta; tM = tail meta
+        hR = head real; tR = tail real
+
 
 --
 -- Archive Type Class

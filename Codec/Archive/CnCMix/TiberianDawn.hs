@@ -104,8 +104,6 @@ readFile3 = CM.readFile3 updateFile3
 readFile3s :: [FilePath] -> IO [CM.File3]
 readFile3s = CM.readFile3s updateFile3
 
-replaceFile3 :: [CM.File3] -> CM.File3 -> [CM.File3]
-replaceFile3 = CM.replaceFile3 CM.combineFile3
 
 updateFile3 :: CM.File3 -> CM.File3
 updateFile3 (CM.File3 [] i c) = (CM.File3 [] i c)
@@ -217,7 +215,7 @@ loadNames fs =
       dummies = map (\x -> CM.File3 x 0 L.empty)
                 $ getLMD $ decode $ CM.contents $ head $ lmd
   in case length $ lmd of
-    1 -> filter (not . isLMD) $ CM.mergeFile3s dummies fs
+    1 -> filter (not . isLMD) $ CM.updateMetadataFile3s dummies fs
     _ -> fs
 
 isLMD :: CM.File3 -> Bool
