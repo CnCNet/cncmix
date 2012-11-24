@@ -212,7 +212,7 @@ saveNames fs
 loadNames :: [CM.File3] -> [CM.File3]
 loadNames fs =
   let lmd     = filter isLMD fs
-      dummies = map (\x -> CM.File3 x 0 L.empty)
+      dummies = map (updateFile3 . \x -> CM.File3 x 0 L.empty)
                 $ getLMD $ decode $ CM.contents $ head $ lmd
   in case length $ lmd of
     1 -> filter (not . isLMD) $ CM.updateMetadataFile3s dummies fs
@@ -243,8 +243,8 @@ instance CM.Archive Mix where
 -- Show Metadata and debug
 --
 
+showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
 showMixHeaders a = (masterHeader a , entryHeaders a)
-
 
 -- Only is accurate if the mix has a local mix database as the FIRST file and entry
 -- (Will read local mix database from any position, but only writes it there)
@@ -265,17 +265,17 @@ roundTripTest a =
                    --L.writeFile (a ++ s1) b1
                    L.writeFile (a ++ s) b2
 
-         testElsePrint b1 b2 =
+         testElsePrint b1 b2 f =
            if b1 == b2
            then print True
            else do print False
-                   print b1
-                   print b2
+                   print $ f b1
+                   print $ f b2
 
      testElseDump a0 a1 "-1"
-     testElsePrint b0 b1
-     testElsePrint c0 c1
+     testElsePrint b0 b1 showMixHeaders
+     testElsePrint c0 c1 CM.showFileHeaders
 
      testElseDump a0 a2 "-2"
-     testElsePrint b0 b2
+     testElsePrint b0 b2 showMixHeaders
      testElseDump a0 z "-3"

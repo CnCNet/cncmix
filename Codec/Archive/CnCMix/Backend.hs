@@ -12,6 +12,7 @@ import Data.Bits
 import Data.Char
 import Data.List
 import Data.Maybe
+import Data.Either
 
 import Numeric
 
@@ -51,17 +52,22 @@ writeFile3s = S.mapM_ . writeFile3
 removeFile3s :: File3 -> [File3] -> [File3]
 removeFile3s new@(File3 nn ni _) fs = filter (detectFile3 nn ni) fs
 
-mergeFile3s ::[File3] -> [File3] -> [File3]
-mergeFile3s = combineFile3sGeneric combineDestructiveFile3 True
-
-mergeFile3 :: File3 -> [File3] -> [File3]
-mergeFile3 a = mergeFile3s [a]
-
 detectFile3 :: String -> Word32 -> File3 -> Bool
 detectFile3 n i x = (i == Codec.Archive.CnCMix.Backend.id x)
                     || (n == name x)
 
+mergeFile3s ::[File3] -> [File3] -> [File3]
+mergeFile3s = combineFile3sGeneric combineDestructiveFile3 True
+
+mergeSymmetricFile3s :: [File3] -> [File3] -> [File3]
+mergeSymmetricFile3s = combineFile3sGeneric combineSafeFile3 True
+
+mergeFile3 :: File3 -> [File3] -> [File3]
+mergeFile3 a = mergeFile3s [a]
+
+updateMetadataFile3s :: [File3] -> [File3] -> [File3]
 updateMetadataFile3s = combineFile3sGeneric combineSafeFile3 False
+
 
 --
 -- Plumbing File Operators
@@ -96,12 +102,20 @@ combineFile3sGeneric :: (File3 -> File3 -> Maybe File3)
 combineFile3sGeneric _ True  k  [] = k
 combineFile3sGeneric _ False _  [] = []
 combineFile3sGeneric _ _     [] k  = k
-combineFile3sGeneric f b meta real = case partition (isJust . f' hR) meta of
+combineFile3sGeneric f b meta real = case partitionEithers $ map (maybeToEither $ f' hR) meta of
   (x@(_:_), y) -> (foldl (\a -> g . f' a) hR x) : combineFile3sGeneric f b y tR
-  ([], (_:_))  -> hR : combineFile3sGeneric f b meta tR
+  ([], _:_)    -> hR                            : combineFile3sGeneric f b meta tR
   where f' = flip f;    g = \(Just a) -> a
         hM = head meta; tM = tail meta
         hR = head real; tR = tail real
+
+maybeToEither :: (b -> Maybe a) -> b -> Either a b
+maybeToEither f a = case f a of
+  Nothing -> Right a
+  Just b  -> Left  b
+
+showFileHeaders :: [File3] -> [(String, String)]
+showFileHeaders = map $ \a -> (name a, showHex (Codec.Archive.CnCMix.Backend.id a) "")
 
 
 --
