@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable #-}
 module Codec.Archive.CnCMix where
 --       (
 --         File
@@ -29,16 +30,17 @@ import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
 
+import System.Console.CmdLib
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
 
-data MixDict = TiberianDawn
+data CnCGame = TiberianDawn
              | RedAlert
              | TiberianSun
              | RedAlert2
              | Renegade
-             deriving (Eq, Ord, Show, Read, Bounded, Enum)
+             deriving (Data, Eq, Ord, Show, Read, Bounded, Enum, Typeable)
 
 detect a = case runGet getWord32le a of
   0x00010000 -> RedAlert
