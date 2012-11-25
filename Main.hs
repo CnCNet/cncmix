@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable #-}
-module Codec.Archive.CnCMix.Console where
+module Main where
 
 import qualified Data.ByteString.Lazy as L
 
@@ -58,7 +58,7 @@ instance Attributes Basic where
     ]
 
 
---  noAttributes = [Help $  "CnCMix by Sonarpulse"
+--  noAttributes = [Help $  "CnCMixer by Sonarpulse"
 --                  ++ "\n" ++ "A simple tool to manipulate Mix archives of the older"
 --                  ++ "Command & Conquer Games, designed especially for automated use."
 --                  ++ "\n" ++ "source at http://github.com/Sonarpulse/CnC-Red-Alert"
@@ -80,6 +80,7 @@ instance RecordCommand Basic where
   mode_summary Extract {} = "extract files from a Mix."
 
 
+ 
 main :: IO ()
 main = getArgs >>= dispatchR [] >>= \x -> case x of
   Create  {} -> putStrLn $ "Not Yet Implemented"
