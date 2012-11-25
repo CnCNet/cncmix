@@ -6,51 +6,51 @@ import Control.Monad
 import Codec.Archive.CnCMix
 
 
-data Basic = Build   { mixPath1 :: FilePath
+data Basic = Build   { mixPath1   :: FilePath
                      , inputFiles :: [FilePath]
-                     , mixType :: CnCGame
-                     , safe :: Bool
+                     , mixType    :: CnCGame
+                     , safe       :: Bool
                      }
-           | Extract { mixPath2 :: FilePath
-                     , outputDirectory :: FilePath
+           | Extract { mixPath2   :: FilePath
+                     , outputDir  :: FilePath
                      }
            deriving (Typeable, Data, Eq)
 
 
 instance Attributes Basic where
   attributes _ = group "Options" [
-    mixPath1 %> [ Short "O"
-                , Long ["mix"]
-                , Help "The path to the Mix to be created."
-                , ArgHelp "Path"
-                , Required True
-                ],
+    mixPath1   %> [ Short "O"
+                  , Long ["mix"]
+                  , Help "The path to the Mix to be created."
+                  , ArgHelp "Path"
+                  , Required True
+                  ],
     inputFiles %> [ Help "The files from which to create the Mix."
                   , ArgHelp "Input Files"
                   , Extra True
                   , Required True
                   ],
-    mixType %> [ Short "t"
-               , Long ["type"]
-               , Help "Which type of Mix should be created?"
-               , ArgHelp "Game-Name"
-               , Required True
-               ],
-    safe %> [ Short "s"
-            , Help "should CnCMix check for ID collisions?"
-            , Invertible True
-            ],
-    mixPath2 %> [ Short "I"
-                , Long ["mix"]
-                , Help "The path to the Mix to be extracted."
-                , ArgHelp "Path"
-                , Required True
-                ],
-    outputDirectory %> [ Short "O"
-                       , Help "The directory into which to extract the files."
-                       , ArgHelp "Path"
-                       , Required True
-                       ]
+    mixType    %> [ Short "t"
+                  , Long ["type"]
+                  , Help "Which type of Mix should be created?"
+                  , ArgHelp "Game-Name"
+                  , Required True
+                  ],
+    safe       %> [ Short "s"
+                  , Help "should CnCMix check for ID collisions?"
+                  , Invertible True
+                  ],
+    mixPath2   %> [ Short "I"
+                  , Long ["mix"]
+                  , Help "The path to the Mix to be extracted."
+                  , ArgHelp "Path"
+                  , Required True
+                  ],
+    outputDir  %> [ Short "O"
+                  , Help "The directory into which to extract the files."
+                  , ArgHelp "Path"
+                  , Required True
+                  ]
     ]
 
 
