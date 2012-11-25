@@ -48,6 +48,25 @@ detect a = case runGet getWord32le a of
   0x00020000 -> RedAlert
   _          -> TiberianDawn
 
+manualDispatch :: CnCGame -> t -> t
+manualDispatch t f1 {-f2 f3 f4 f5-} =
+  case t of
+    TiberianDawn -> f1
+    --RedAlert     -> TD.readFile3s
+    --TiberianSun  -> TD.readFile3s
+    --RedAlert2    -> TD.readFile3s
+    --Renegade     -> TD.readFile3s
+
+dispatchReadFile3s :: CnCGame -> [FilePath] -> IO [File3]
+dispatchReadFile3s t = manualDispatch t $ TD.readFile3s
+                       {- $ RA.readFile3s  $ TS.readFile3s
+                          $ RA2.readFile3s $ Rg.readFile3s -}
+
+dispatchReadFile3 :: CnCGame -> FilePath -> IO File3
+dispatchReadFile3 t = manualDispatch t $ TD.readFile3
+                      {- $ RA.readFile3  $ TS.readFile3
+                         $ RA2.readFile3 $ Rg.readFile3 -}
+
 dispatchEncode :: CnCGame -> [File3] -> L.ByteString
 dispatchEncode t =
   case t of

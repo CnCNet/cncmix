@@ -1,9 +1,13 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable #-}
 module Codec.Archive.CnCMix.Console where
+
+import qualified Data.ByteString.Lazy as L
+
 import System.Console.CmdLib
 import Control.Monad
 
 import Codec.Archive.CnCMix
+import Codec.Archive.CnCMix.Backend
 
 
 data Basic = Build   { mixPath1   :: FilePath
@@ -62,8 +66,15 @@ instance Attributes Basic where
 
 
 instance RecordCommand Basic where
-  run' cmd@(Build   {}) _ = putStrLn "not yet"
-  run' cmd@(Extract {}) _ = putStrLn "not yet"
+  run' cmd@(Build   {}) _ = L.writeFile (mixPath1 cmd)
+                            =<< (liftM (dispatchEncode mType)
+                                 $ dispatchReadFile3s mType $ inputFiles cmd)
+    where mType = mixType  cmd
+          mPath = mixPath1 cmd
+  run' cmd@(Extract {}) _ = writeFile3s oDir
+                            =<< (liftM dispatchDecode $ L.readFile mPath)
+    where oDir  = outputDir cmd
+          mPath = mixPath1 cmd
 
   mode_summary Build   {} = "create a new Mix file"
   mode_summary Extract {} = "extract files from a Mix."
@@ -73,4 +84,3 @@ main :: IO ()
 main = getArgs >>= dispatchR [] >>= \x -> case x of
   Build   {} -> putStrLn $ "Not Yet Implemented"
   Extract {} -> putStrLn $ "Not Yet Implemented"
-  -- _          -> putStrLn $ show (greeting x)
