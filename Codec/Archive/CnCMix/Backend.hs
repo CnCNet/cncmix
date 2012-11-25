@@ -45,7 +45,8 @@ readFile3s :: (String -> Word32) -> [FilePath] -> IO [File3]
 readFile3s f = S.mapM $ readFile3 f
 
 writeFile3 :: FilePath -> File3 -> IO ()
-writeFile3 p (File3 n _ c) = L.writeFile (p </> n) $ c
+writeFile3 p (File3 []      i c) = L.writeFile (p </> "0x" ++ showHex i "") $ c
+writeFile3 p (File3 n@(_:_) _ c) = L.writeFile (p </> n) $ c
 
 writeFile3s :: FilePath -> [File3] -> IO ()
 writeFile3s = S.mapM_ . writeFile3
