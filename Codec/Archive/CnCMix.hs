@@ -42,37 +42,26 @@ data CnCGame = TiberianDawn
              | Renegade
              deriving (Data, Eq, Ord, Show, Read, Bounded, Enum, Typeable)
 
+detect :: L.ByteString -> CnCGame
 detect a = case runGet getWord32le a of
   0x00010000 -> RedAlert
   0x00020000 -> RedAlert
   _          -> TiberianDawn
 
-data Mix = TD  TD.Mix
-         -- | RA  RA.Mix
-         -- | TS  TS.Mix
-         -- | RA2 RA2.Mix
-         -- | RG  RG.Mix
-
-manualDispatch t f1 {- f2 f3 f4 f5 -} =
+dispatchEncode :: CnCGame -> [File3] -> L.ByteString
+dispatchEncode t =
   case t of
-    TiberianDawn -> TD . f1
-    --RedAlert     -> RA  . f2
-    --TiberianSun  -> TS  . f3
-    --RedAlert2    -> RA2 . f4
-    --Renegade     -> RG  . f5
+    TiberianDawn -> encode . (filesToArchive :: [File3] -> TD.Mix)
+    --RedAlert     -> encode . (filesToArchive :: [File3] -> RA.Mix)
+    --TiberianSun  -> encode . (filesToArchive :: [File3] -> TS.Mix)
+    --RedAlert2    -> encode . (filesToArchive :: [File3] -> RA2.Mix)
+    --Renegade     -> encode . (filesToArchive :: [File3] -> Rg.Mix)
 
-autoDispatch f1 {- f2 f3 f4 f5 -} a =
-  manualDispatch (detect a) f1 {- f2 f3 f4 f5 -} a
-
-dBinaryToMix = autoDispatch decode {- decode decode decode decode -}
-
-dFilesToMix t = manualDispatch t filesToArchive {- decode decode decode decode -}
-
-g = (filesToArchive :: [File3] -> TD.Mix)
-h = (archiveToFiles :: TD.Mix -> [File3])
-
---filesMixIO :: FilePath -> [FilePath] -> IO ()
-filesMixIO a = ((S.liftM g) . TD.readFile3s) S.>=> (encodeFile a)
-
---mixToFilesIO :: FilePath -> FilePath -> IO [()]
-mixToFilesIO a = ((S.liftM h) . decodeFile) S.>=> (writeFile3s a)
+dispatchDecode :: L.ByteString -> [File3]
+dispatchDecode b =
+  case (detect b) of
+    TiberianDawn -> archiveToFiles $ (decode b :: TD.Mix)
+    --RedAlert     -> archiveToFiles $ (decode b :: RA.Mix)
+    --TiberianSun  -> archiveToFiles $ (decode b :: TS.Mix)
+    --RedAlert2    -> archiveToFiles $ (decode b :: RA2.Mix)
+    --Renegade     -> archiveToFiles $ (decode b :: Rg.Mix)
