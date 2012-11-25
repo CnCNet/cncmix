@@ -36,11 +36,12 @@ data File3 = File3 { name     :: String
 -- Porcelain File Operators
 --
 
-readFile3 :: (File3 -> File3) -> FilePath -> IO File3
-readFile3 f p = return . f . File3 shortname 0 =<< L.readFile p
+
+readFile3 :: (String -> Word32) -> FilePath -> IO File3
+readFile3 f p = return . (updateFile3 f) . File3 shortname 0 =<< L.readFile p
   where shortname = takeFileName p
 
-readFile3s :: (File3 -> File3) -> [FilePath] -> IO [File3]
+readFile3s :: (String -> Word32) -> [FilePath] -> IO [File3]
 readFile3s f = S.mapM $ readFile3 f
 
 writeFile3 :: FilePath -> File3 -> IO ()
@@ -113,6 +114,20 @@ maybeToEither :: (b -> Maybe a) -> b -> Either a b
 maybeToEither f a = case f a of
   Nothing -> Right a
   Just b  -> Left  b
+
+updateFile3 :: (String -> Word32) -> File3 -> File3
+updateFile3 _ (File3 [] i c) = (File3 [] i c)
+updateFile3 _ (File3 ('0':'x':s) i c)
+  | i == 0    = File3 [] i' c
+  | i == i'   = File3 [] i' c
+  | otherwise = error "id does not match filename"
+  where i' = fst $ Prelude.head $ readHex s
+updateFile3 s2id (File3 s@(_:_) i c)
+  | i == 0    = File3 s i' c
+  | i == i'   = File3 s i' c
+  | otherwise = error "id does not match filename"
+  where i' = s2id s
+
 
 showFileHeaders :: [File3] -> [(String, String)]
 showFileHeaders = map $ \a -> (name a, showHex (Codec.Archive.CnCMix.Backend.id a) "")

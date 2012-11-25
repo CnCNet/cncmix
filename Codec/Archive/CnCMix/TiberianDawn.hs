@@ -99,25 +99,13 @@ stringToId = (word32sToId . stringToWord32s)
 --
 
 readFile3 :: FilePath -> IO CM.File3
-readFile3 = CM.readFile3 updateFile3
+readFile3 = CM.readFile3 stringToId
 
 readFile3s :: [FilePath] -> IO [CM.File3]
-readFile3s = CM.readFile3s updateFile3
-
+readFile3s = CM.readFile3s stringToId
 
 updateFile3 :: CM.File3 -> CM.File3
-updateFile3 (CM.File3 [] i c) = (CM.File3 [] i c)
-updateFile3 (CM.File3 ('0':'x':s) i c)
-  | i == 0    = CM.File3 [] i' c
-  | i == i'   = CM.File3 [] i' c
-  | otherwise = error "id does not match filename"
-  where i' = fst $ Prelude.head $ readHex s
-updateFile3 (CM.File3 s@(_:_) i c)
-  | i == 0    = CM.File3 s i' c
-  | i == i'   = CM.File3 s i' c
-  | otherwise = error "id does not match filename"
-  where i' = stringToId s
-
+updateFile3 = CM.updateFile3 stringToId
 
 --
 -- decode/encode Mix
