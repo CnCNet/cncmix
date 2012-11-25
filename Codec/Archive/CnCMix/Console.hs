@@ -10,7 +10,7 @@ import Codec.Archive.CnCMix
 import Codec.Archive.CnCMix.Backend
 
 
-data Basic = Build   { mixPath1   :: FilePath
+data Basic = Create  { mixPath1   :: FilePath
                      , inputFiles :: [FilePath]
                      , mixType    :: CnCGame
                      , safe       :: Bool
@@ -66,7 +66,7 @@ instance Attributes Basic where
 
 
 instance RecordCommand Basic where
-  run' cmd@(Build   {}) _ = L.writeFile (mixPath1 cmd)
+  run' cmd@(Create  {}) _ = L.writeFile (mixPath1 cmd)
                             =<< (liftM (dispatchEncode mType)
                                  $ dispatchReadFile3s mType $ inputFiles cmd)
     where mType = mixType  cmd
@@ -76,11 +76,11 @@ instance RecordCommand Basic where
     where oDir  = outputDir cmd
           mPath = mixPath1 cmd
 
-  mode_summary Build   {} = "create a new Mix file"
+  mode_summary Create  {} = "create a new Mix file"
   mode_summary Extract {} = "extract files from a Mix."
 
 
 main :: IO ()
 main = getArgs >>= dispatchR [] >>= \x -> case x of
-  Build   {} -> putStrLn $ "Not Yet Implemented"
+  Create  {} -> putStrLn $ "Not Yet Implemented"
   Extract {} -> putStrLn $ "Not Yet Implemented"
