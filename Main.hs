@@ -24,13 +24,13 @@ data Basic = Test    { mixPath1   :: FilePath }
 
 instance Attributes Basic where
   attributes _ = group "Options" [
-    mixPath1   %> [ Short "I"
+    mixPath1   %> [ Short ['I']
                   , Long ["mix"]
                   , Help "The path to the Mix to test."
                   , ArgHelp "Path"
                   , Required True
                   ],
-    mixPath2   %> [ Short "O"
+    mixPath2   %> [ Short ['O']
                   , Long ["mix"]
                   , Help "The path to the Mix to be created."
                   , ArgHelp "Path"
@@ -41,23 +41,24 @@ instance Attributes Basic where
                   , Extra True
                   , Required True
                   ],
-    mixType    %> [ Short "t"
+    mixType    %> [ Short ['t']
                   , Long ["type"]
                   , Help "Which type of Mix should be created?"
                   , ArgHelp "Game-Name"
-                  , Required True
+                  --, Required True
+                  , Default TiberianDawn
                   ],
-    safe       %> [ Short "s"
+    safe       %> [ Short ['s']
                   , Help "should CnCMix check for ID collisions?"
                   , Invertible True
                   ],
-    mixPath3   %> [ Short "I"
+    mixPath3   %> [ Short ['I']
                   , Long ["mix"]
                   , Help "The path to the Mix to be extracted."
                   , ArgHelp "Path"
                   , Required True
                   ],
-    outputDir  %> [ Short "O"
+    outputDir  %> [ Short ['O']
                   , Help "The directory into which to extract the files."
                   , ArgHelp "Path"
                   , Required True
@@ -75,7 +76,7 @@ instance Attributes Basic where
 instance RecordCommand Basic where
   run' cmd@(Test    {}) _ = putStrLn =<< (liftM (show . detect) $ L.readFile mPath)
     where mPath = mixPath1 cmd
-  run' cmd@(Create  {}) _ = L.writeFile (mixPath1 cmd)
+  run' cmd@(Create  {}) _ = L.writeFile mPath
                             =<< (liftM (dispatchEncode mType)
                                  $ dispatchReadFile3s mType $ inputFiles cmd)
     where mType = mixType  cmd
@@ -90,7 +91,6 @@ instance RecordCommand Basic where
   mode_summary Extract {} = "extract files from a Mix."
 
 
- 
 main :: IO ()
 main = do x <- getArgs
           dispatchR [] x >>= \y -> case y of
