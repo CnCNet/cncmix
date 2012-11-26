@@ -105,16 +105,16 @@ combineFile3sGeneric _ True  k  [] = k
 combineFile3sGeneric _ False _  [] = []
 combineFile3sGeneric _ _     [] k  = k
 combineFile3sGeneric f b meta real = case partitionEithers $ map (maybeToEither $ f' hR) meta of
-  (x@(_:_), y) -> (foldl (\a -> g . f' a) hR x) : combineFile3sGeneric f b y tR
-  ([], _:_)    -> hR                            : combineFile3sGeneric f b meta tR
+  (y, x@(_:_)) -> (foldl (\a -> g . f' a) hR x) : combineFile3sGeneric f b y tR
+  (_:_, [])    -> hR                            : combineFile3sGeneric f b meta tR
   where f' = flip f;    g = \(Just a) -> a
         hM = head meta; tM = tail meta
         hR = head real; tR = tail real
 
-maybeToEither :: (b -> Maybe a) -> b -> Either a b
+maybeToEither :: (a -> Maybe b) -> a -> Either a b
 maybeToEither f a = case f a of
-  Nothing -> Right a
-  Just b  -> Left  b
+  Nothing -> Left  a
+  Just b  -> Right b
 
 updateFile3 :: (String -> Word32) -> File3 -> File3
 updateFile3 _ (File3 [] i c) = (File3 [] i c)
