@@ -74,7 +74,7 @@ instance RecordCommand Basic where
   run' cmd@(Extract {}) _ = writeFile3s oDir
                             =<< (liftM dispatchDecode $ L.readFile mPath)
     where oDir  = outputDir cmd
-          mPath = mixPath1 cmd
+          mPath = mixPath2 cmd
 
   mode_summary Create  {} = "create a new Mix file"
   mode_summary Extract {} = "extract files from a Mix."
@@ -82,6 +82,7 @@ instance RecordCommand Basic where
 
  
 main :: IO ()
-main = getArgs >>= dispatchR [] >>= \x -> case x of
-  Create  {} -> putStrLn $ "Not Yet Implemented"
-  Extract {} -> putStrLn $ "Not Yet Implemented"
+main = do x <- getArgs
+          dispatchR [] x >>= \y -> case y of
+            cmd@(Create  {}) -> run' cmd x
+            cmd@(Extract {}) -> run' cmd x
