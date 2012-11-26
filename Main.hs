@@ -10,12 +10,13 @@ import Codec.Archive.CnCMix
 import Codec.Archive.CnCMix.Backend
 
 
-data Basic = Create  { mixPath1   :: FilePath
+data Basic = Test    { mixPath1   :: FilePath }
+           | Create  { mixPath2   :: FilePath
                      , inputFiles :: [FilePath]
                      , mixType    :: CnCGame
                      , safe       :: Bool
                      }
-           | Extract { mixPath2   :: FilePath
+           | Extract { mixPath3   :: FilePath
                      , outputDir  :: FilePath
                      }
            deriving (Typeable, Data, Eq)
@@ -23,7 +24,13 @@ data Basic = Create  { mixPath1   :: FilePath
 
 instance Attributes Basic where
   attributes _ = group "Options" [
-    mixPath1   %> [ Short "O"
+    mixPath1   %> [ Short "I"
+                  , Long ["mix"]
+                  , Help "The path to the Mix to test."
+                  , ArgHelp "Path"
+                  , Required True
+                  ],
+    mixPath2   %> [ Short "O"
                   , Long ["mix"]
                   , Help "The path to the Mix to be created."
                   , ArgHelp "Path"
@@ -44,7 +51,7 @@ instance Attributes Basic where
                   , Help "should CnCMix check for ID collisions?"
                   , Invertible True
                   ],
-    mixPath2   %> [ Short "I"
+    mixPath3   %> [ Short "I"
                   , Long ["mix"]
                   , Help "The path to the Mix to be extracted."
                   , ArgHelp "Path"
@@ -66,17 +73,20 @@ instance Attributes Basic where
 
 
 instance RecordCommand Basic where
+  run' cmd@(Test    {}) _ = putStrLn =<< (liftM (show . detect) $ L.readFile mPath)
+    where mPath = mixPath1 cmd
   run' cmd@(Create  {}) _ = L.writeFile (mixPath1 cmd)
                             =<< (liftM (dispatchEncode mType)
                                  $ dispatchReadFile3s mType $ inputFiles cmd)
     where mType = mixType  cmd
-          mPath = mixPath1 cmd
+          mPath = mixPath2 cmd
   run' cmd@(Extract {}) _ = writeFile3s oDir
                             =<< (liftM dispatchDecode $ L.readFile mPath)
     where oDir  = outputDir cmd
-          mPath = mixPath2 cmd
+          mPath = mixPath3 cmd
 
-  mode_summary Create  {} = "create a new Mix file"
+  mode_summary Test    {} = "probe a Mix archive to see what type it is."
+  mode_summary Create  {} = "create a new Mix archive."
   mode_summary Extract {} = "extract files from a Mix."
 
 
@@ -84,5 +94,6 @@ instance RecordCommand Basic where
 main :: IO ()
 main = do x <- getArgs
           dispatchR [] x >>= \y -> case y of
+            cmd@(Test    {}) -> run' cmd x
             cmd@(Create  {}) -> run' cmd x
             cmd@(Extract {}) -> run' cmd x
