@@ -3,6 +3,8 @@ module Main where
 
 import qualified Data.ByteString.Lazy as L
 
+import System.FilePath
+import System.Directory
 import System.Console.CmdLib
 import Control.Monad
 
@@ -36,7 +38,7 @@ instance Attributes Basic where
                   , ArgHelp "Path"
                   , Required True
                   ],
-    inputFiles %> [ Help "The files from which to create the Mix."
+    inputFiles %> [ Help "The files from which to create the Mix. Folders will be recurred into."
                   , ArgHelp "Input Files"
                   , Extra True
                   , Required True
@@ -72,15 +74,25 @@ instance Attributes Basic where
 --                  ++ "\n" ++ "source at http://github.com/Sonarpulse/CnC-Red-Alert"
 --                  ++ "\n" ++ "run again with '\"'--help'\"' to see avaible options"]
 
+getDirContentsRecursive :: FilePath -> IO [FilePath]
+getDirContentsRecursive p =
+  doesDirectoryExist p >>= \x ->
+  if x
+  then liftM concat . mapping . filtBad =<< getDirectoryContents p
+  else return [p]
+  where mapping = mapM $ getDirContentsRecursive . (p </>)
+        filtBad = filter $ \x -> x /= "." && x /= ".."
+
 
 instance RecordCommand Basic where
   run' cmd@(Test    {}) _ = putStrLn =<< (liftM (show . detect) $ L.readFile mPath)
     where mPath = mixPath1 cmd
   run' cmd@(Create  {}) _ = L.writeFile mPath
                             =<< (liftM (dispatchEncode mType)
-                                 $ dispatchReadFile3s mType $ inputFiles cmd)
+                                 . dispatchReadFile3s mType) =<< inFs
     where mType = mixType  cmd
           mPath = mixPath2 cmd
+          inFs  = liftM concat . mapM getDirContentsRecursive $ inputFiles cmd
   run' cmd@(Extract {}) _ = writeFile3s oDir
                             =<< (liftM dispatchDecode $ L.readFile mPath)
     where oDir  = outputDir cmd
