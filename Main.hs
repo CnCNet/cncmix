@@ -89,24 +89,21 @@ instance RecordCommand Basic where
     where mPath = mixPath1 cmd
 
   run' cmd@(Create  {}) _ =
-    L.writeFile mPath =<<
+    L.writeFile mPath . dispatchEncode mType =<<
     (\pred ->
       (\new ->
         if pred
-        then liftM ((\old -> dispatchEncode mType
-                             $ if isS
-                               then mergeSafeRecursiveFile3s old new
-                               else old) . dispatchDecode)
-             $ L.readFile mPath
-        else return $ dispatchEncode mType
-             $ if isS
-               then mergeSafeRecursiveFile3s [] new
-               else new)
-      =<< dispatchReadFile3s mType =<< inFs)
+        then ((\old -> if isS
+                       then mergeSafeRecursiveFile3s old new
+                       else mergeFile3s old new) . dispatchDecode)
+             `liftM` L.readFile mPath
+        else return  $ if isS
+                       then mergeSafeRecursiveFile3s [] new
+                       else new)
+      =<< dispatchReadFile3s mType =<< (liftM concat . mapM getDirContentsRecursive $ inputFiles cmd))
     =<< doesFileExist mPath
     where mType = mixType  cmd
           mPath = mixPath2 cmd
-          inFs  = liftM concat . mapM getDirContentsRecursive $ inputFiles cmd
           isS  = safe cmd
 
   run' cmd@(Extract {}) _ = writeFile3s oDir
