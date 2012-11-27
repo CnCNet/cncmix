@@ -85,25 +85,25 @@ getDirContentsRecursive p =
 
 
 instance RecordCommand Basic where
-  run' cmd@(Test    {}) _ = putStrLn =<< (liftM (show . detect) $ L.readFile mPath)
+  run' cmd@(Test    {}) _ = putStrLn =<< liftM (show . detect) (L.readFile mPath)
     where mPath = mixPath1 cmd
 
   run' cmd@(Create  {}) _ =
-    doesFileExist mPath >>= \x ->
-    if x
-    then L.writeFile mPath
-         =<< liftM2 (\a b -> dispatchEncode mType
+    L.writeFile mPath =<<
+    (\pred ->
+      (\new ->
+        if pred
+        then liftM ((\old -> dispatchEncode mType
                              $ if isS
-                               then mergeSafeRecursiveFile3s a b
-                               else a)
-         (dispatchReadFile3s mType =<< inFs)
-         (liftM dispatchDecode $ L.readFile mPath)
-    else L.writeFile mPath
-         =<< liftM (dispatchEncode mType
-                    . if isS
-                      then mergeSafeRecursiveFile3s []
-                      else Prelude.id)
-         . dispatchReadFile3s mType =<< inFs
+                               then mergeSafeRecursiveFile3s old new
+                               else old) . dispatchDecode)
+             $ L.readFile mPath
+        else return $ dispatchEncode mType
+             $ if isS
+               then mergeSafeRecursiveFile3s [] new
+               else new)
+      =<< dispatchReadFile3s mType =<< inFs)
+    =<< doesFileExist mPath
     where mType = mixType  cmd
           mPath = mixPath2 cmd
           inFs  = liftM concat . mapM getDirContentsRecursive $ inputFiles cmd
