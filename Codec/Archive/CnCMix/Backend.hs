@@ -70,6 +70,8 @@ mergeFile3 olds new = mergeFile3s olds [new]
 updateMetadataFile3s :: [File3] -> [File3] -> [File3]
 updateMetadataFile3s = combineFile3sGeneric combineSafeFile3 False
 
+mergeSafeRecursiveFile3s :: [File3] -> [File3] -> [File3]
+mergeSafeRecursiveFile3s a = foldl mergeFile3 a
 
 --
 -- Plumbing File Operators
