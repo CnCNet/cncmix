@@ -203,7 +203,7 @@ loadNames fs =
       dummies = map (updateFile3 . \x -> CM.File3 x 0 L.empty)
                 $ getLMD $ decode $ CM.contents $ head $ lmd
   in case length $ lmd of
-    1 -> filter (not . isLMD) $ CM.updateMetadataFile3s dummies fs
+    1 -> filter (not . isLMD) $ CM.updateMetadataFile3s fs dummies
     _ -> fs
 
 isLMD :: CM.File3 -> Bool

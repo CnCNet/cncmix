@@ -51,8 +51,8 @@ writeFile3 p (File3 n@(_:_) _ c) = L.writeFile (p </> n) $ c
 writeFile3s :: FilePath -> [File3] -> IO ()
 writeFile3s = S.mapM_ . writeFile3
 
-removeFile3s :: File3 -> [File3] -> [File3]
-removeFile3s new@(File3 nn ni _) fs = filter (detectFile3 nn ni) fs
+removeFile3s :: [File3] -> File3 -> [File3]
+removeFile3s olds (File3 nn ni _) = filter (detectFile3 nn ni) olds
 
 detectFile3 :: String -> Word32 -> File3 -> Bool
 detectFile3 n i x = (i == Codec.Archive.CnCMix.Backend.id x)
@@ -64,8 +64,8 @@ mergeFile3s = combineFile3sGeneric combineDestructiveFile3 True
 mergeSymmetricFile3s :: [File3] -> [File3] -> [File3]
 mergeSymmetricFile3s = combineFile3sGeneric combineSafeFile3 True
 
-mergeFile3 :: File3 -> [File3] -> [File3]
-mergeFile3 a = mergeFile3s [a]
+mergeFile3 :: [File3] -> File3 -> [File3]
+mergeFile3 olds new = mergeFile3s olds [new]
 
 updateMetadataFile3s :: [File3] -> [File3] -> [File3]
 updateMetadataFile3s = combineFile3sGeneric combineSafeFile3 False
@@ -84,8 +84,8 @@ combineDestructiveFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
         cF a b base
           | a == base = Just b
           | b == base = Just a
-          | a == b    = Just a
-          | otherwise = Just a
+          | a == b    = Just b
+          | otherwise = Just b
 
 combineSafeFile3 :: File3 -> File3 -> Maybe File3
 combineSafeFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
@@ -96,7 +96,7 @@ combineSafeFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
         cF a b base
           | a == base = Just b
           | b == base = Just a
-          | a == b    = Just a
+          | a == b    = Just b
           | otherwise = Nothing
 
 combineFile3sGeneric :: (File3 -> File3 -> Maybe File3)
@@ -104,12 +104,11 @@ combineFile3sGeneric :: (File3 -> File3 -> Maybe File3)
 combineFile3sGeneric _ True  k  [] = k
 combineFile3sGeneric _ False _  [] = []
 combineFile3sGeneric _ _     [] k  = k
-combineFile3sGeneric f b meta real = case partitionEithers $ map (maybeToEither $ f' hR) meta of
-  (y, x@(_:_)) -> (foldl (\a -> g . f' a) hR x) : combineFile3sGeneric f b y tR
-  (_:_, [])    -> hR                            : combineFile3sGeneric f b meta tR
-  where f' = flip f;    g = \(Just a) -> a
-        hM = head meta; tM = tail meta
-        hR = head real; tR = tail real
+combineFile3sGeneric f b old new  = case partitionEithers $ map (maybeToEither $ f hO) new of
+  (x, y@(_:_)) -> (foldl (\a -> fromJust . f a) hO y) : combineFile3sGeneric f b tO x
+  (_:_, [])    -> hO                                  : combineFile3sGeneric f b tO new
+  where hN = head new; tN = tail new
+        hO = head old; tO = tail old
 
 maybeToEither :: (a -> Maybe b) -> a -> Either a b
 maybeToEither f a = case f a of
