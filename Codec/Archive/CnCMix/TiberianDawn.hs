@@ -193,7 +193,7 @@ saveNames fs
   | null $ filter (\(CM.File3 n _ _) -> not $ null n) fs = fs
   | otherwise =
     (CM.File3 [] 0x54c2d545 $ encode $ LocalMixDatabase $ "local mix database.dat" : filter (/=[]) names)
-    : (map (\(CM.File3 _ i c) -> CM.File3 [] i c) fs')
+    : fs'
   where fs'    = filter (not . isLMD) fs
         names  = map CM.name fs'
 
@@ -262,7 +262,8 @@ roundTripTest a =
 
      testElseDump a0 a1 "-1"
      testElsePrint b0 b1 showMixHeaders
-     testElsePrint c0 c1 CM.showFileHeaders
+     testElsePrint c0 (map (\(CM.File3 _ i c) -> CM.File3 [] i c) c1) CM.showFileHeaders
+     --names stripped so test works, (loading and saving names keeps names in files3)
 
      testElseDump a0 a2 "-2"
      testElsePrint b0 b2 showMixHeaders

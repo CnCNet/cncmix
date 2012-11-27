@@ -3,6 +3,8 @@ module Main where
 
 import qualified Data.ByteString.Lazy as L
 
+import Numeric
+
 import System.FilePath
 import System.Directory
 import System.Console.CmdLib
@@ -12,7 +14,8 @@ import Codec.Archive.CnCMix
 import Codec.Archive.CnCMix.Backend
 
 
-data Basic = Test    { mixPath1   :: FilePath }
+data Basic = Test    { mixPath1   :: FilePath
+                     }
            | Create  { mixPath2   :: FilePath
                      , inputFiles :: [FilePath]
                      , mixType    :: CnCGame
@@ -20,6 +23,10 @@ data Basic = Test    { mixPath1   :: FilePath }
                      }
            | Extract { mixPath3   :: FilePath
                      , outputDir  :: FilePath
+                     }
+           | Remove  { mixPath4   :: FilePath
+                     , names      :: [String]
+                     , ids        :: [String]
                      }
            deriving (Typeable, Data, Eq)
 
@@ -32,6 +39,7 @@ instance Attributes Basic where
                   , ArgHelp "Path"
                   , Required True
                   ],
+
     mixPath2   %> [ Short ['O']
                   , Long ["mix"]
                   , Help "The path to the Mix to be created."
@@ -39,7 +47,7 @@ instance Attributes Basic where
                   , Required True
                   ],
     inputFiles %> [ Help "The files from which to create the Mix. Folders will be recurred into."
-                  , ArgHelp "Input Files"
+                  , ArgHelp "Paths"
                   , Extra True
                   , Required True
                   ],
@@ -54,6 +62,7 @@ instance Attributes Basic where
                   , Help "should CnCMix check for ID collisions?"
                   , Invertible True
                   ],
+
     mixPath3   %> [ Short ['I']
                   , Long ["mix"]
                   , Help "The path to the Mix to be extracted."
@@ -64,6 +73,23 @@ instance Attributes Basic where
                   , Help "The directory into which to extract the files."
                   , ArgHelp "Path"
                   , Required True
+                  ],
+
+    mixPath4   %> [ Short ['I']
+                  , Long ["mix"]
+                  , Help "The path to the Mix to be filtered."
+                  , ArgHelp "Path"
+                  , Required True
+                  ],
+    names      %> [ Short ['n']
+                  , Long ["names"]
+                  , Help "the names of the files to be removed"
+                  , ArgHelp "Strings"
+                  ],
+    ids        %> [ Short ['i']
+                  , Long ["IDs"]
+                  , Help "the IDs of the files to be removed, in hexidecimal"
+                  , ArgHelp "Strings"
                   ]
     ]
 
@@ -102,16 +128,28 @@ instance RecordCommand Basic where
        L.writeFile mPath $ dispatchEncode mType nMix
     where mType = mixType  cmd
           mPath = mixPath2 cmd
-          isS  = safe cmd
+          isS   = safe cmd
 
   run' cmd@(Extract {}) _ = writeFile3s oDir
                             =<< liftM dispatchDecode (L.readFile mPath)
     where oDir  = outputDir cmd
           mPath = mixPath3 cmd
 
+  run' cmd@(Remove  {}) _ =
+    do mType <- liftM detect $ L.readFile mPath
+       (L.writeFile mPath . dispatchEncode mType
+        . filter (detectFile3s bNames $ map (fst . head . readHex) bIDs))
+         =<< liftM dispatchDecode (L.readFile mPath)
+    where
+          mPath  = mixPath4 cmd
+          bIDs   = ids cmd
+          bNames = names cmd
+
+
   mode_summary Test    {} = "probe a Mix archive to see what type it is."
   mode_summary Create  {} = "create a new Mix archive."
   mode_summary Extract {} = "extract files from a Mix."
+  mode_summary Remove  {} = "remove files from a Mix."
 
 
 main :: IO ()
@@ -120,3 +158,4 @@ main = do x <- getArgs
             cmd@(Test    {}) -> run' cmd x
             cmd@(Create  {}) -> run' cmd x
             cmd@(Extract {}) -> run' cmd x
+            cmd@(Remove  {}) -> run' cmd x

@@ -51,12 +51,13 @@ writeFile3 p (File3 n@(_:_) _ c) = L.writeFile (p </> n) $ c
 writeFile3s :: FilePath -> [File3] -> IO ()
 writeFile3s = S.mapM_ . writeFile3
 
-removeFile3s :: [File3] -> File3 -> [File3]
-removeFile3s olds (File3 nn ni _) = filter (detectFile3 nn ni) olds
+removeFile3 :: [File3] -> File3 -> [File3]
+removeFile3 olds (File3 nn ni _) = filter (detectFile3 nn ni) olds
 
-detectFile3 :: String -> Word32 -> File3 -> Bool
-detectFile3 n i x = (i == Codec.Archive.CnCMix.Backend.id x)
-                    || (n == name x)
+removeFile3s :: [File3] -> [File3] -> [File3]
+removeFile3s olds news = filter (detectFile3s (map name news)
+                                 $ map Codec.Archive.CnCMix.Backend.id news)
+                         olds
 
 mergeFile3s ::[File3] -> [File3] -> [File3]
 mergeFile3s = combineFile3sGeneric combineDestructiveFile3 True
@@ -76,6 +77,14 @@ mergeSafeRecursiveFile3s a = foldl mergeFile3 a
 --
 -- Plumbing File Operators
 --
+
+detectFile3 :: String -> Word32 -> File3 -> Bool
+detectFile3 n i x = (i == Codec.Archive.CnCMix.Backend.id x)
+                    || (n == name x)
+
+detectFile3s :: [String] -> [Word32] -> File3 -> Bool
+detectFile3s n i x = (or $ map (== Codec.Archive.CnCMix.Backend.id x) i)
+                    || (or $ map (== name x) n)
 
 combineDestructiveFile3 :: File3 -> File3 -> Maybe File3
 combineDestructiveFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
