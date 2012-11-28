@@ -96,7 +96,7 @@ combineDestructiveFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
           | a == base = Just b
           | b == base = Just a
           | a == b    = Just b
-          | otherwise = Just b
+          | otherwise = Nothing
 
 combineSafeFile3 :: File3 -> File3 -> Maybe File3
 combineSafeFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
@@ -139,9 +139,9 @@ updateFile3 s2id (File3 s@(_:_) i c)
   | otherwise = error "id does not match filename"
   where i' = s2id s
 
-
 showFileHeaders :: [File3] -> [(String, String)]
-showFileHeaders = map $ \a -> (name a, showHex (Codec.Archive.CnCMix.Backend.id a) "")
+showFileHeaders = map $ \a -> (chk $ name a, showHex (Codec.Archive.CnCMix.Backend.id a) "")
+  where chk a = if a==[] then "<unkown name>" else a
 
 
 --

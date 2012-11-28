@@ -1,10 +1,11 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable #-}
-module Main where
+module Main(main) where
 
 import qualified Data.ByteString.Lazy as L
 
 import Numeric
 
+import System.IO
 import System.FilePath
 import System.Directory
 import System.Console.CmdLib
@@ -28,6 +29,8 @@ data Basic = Test    { mixPath1   :: FilePath
                      , names      :: [String]
                      , ids        :: [String]
                      }
+           | Print   { mixPath5   :: FilePath
+                     }
            deriving (Typeable, Data, Eq)
 
 
@@ -35,25 +38,25 @@ instance Attributes Basic where
   attributes _ = group "Options" [
     mixPath1   %> [ Short ['I']
                   , Long ["mix"]
-                  , Help "The path to the Mix to test."
+                  , Help "the path to the Mix to test"
                   , ArgHelp "Path"
                   , Required True
                   ],
 
     mixPath2   %> [ Short ['O']
                   , Long ["mix"]
-                  , Help "The path to the Mix to be created."
+                  , Help "the path to the Mix to be created"
                   , ArgHelp "Path"
                   , Required True
                   ],
-    inputFiles %> [ Help "The files from which to create the Mix. Folders will be recurred into."
+    inputFiles %> [ Help "the files from which to create the Mix. Folders will be recurred into"
                   , ArgHelp "Paths"
                   , Extra True
                   , Required True
                   ],
     mixType    %> [ Short ['t']
                   , Long ["type"]
-                  , Help "Which type of Mix should be created?"
+                  , Help "which type of Mix should be created?"
                   , ArgHelp "Game-Name"
                   --, Required True
                   , Default TiberianDawn
@@ -65,19 +68,19 @@ instance Attributes Basic where
 
     mixPath3   %> [ Short ['I']
                   , Long ["mix"]
-                  , Help "The path to the Mix to be extracted."
+                  , Help "the path to the Mix to be extracted"
                   , ArgHelp "Path"
                   , Required True
                   ],
     outputDir  %> [ Short ['O']
-                  , Help "The directory into which to extract the files."
+                  , Help "the directory into which to extract the files"
                   , ArgHelp "Path"
                   , Required True
                   ],
 
     mixPath4   %> [ Short ['I']
                   , Long ["mix"]
-                  , Help "The path to the Mix to be filtered."
+                  , Help "the path to the Mix to be filtered"
                   , ArgHelp "Path"
                   , Required True
                   ],
@@ -88,8 +91,14 @@ instance Attributes Basic where
                   ],
     ids        %> [ Short ['i']
                   , Long ["IDs"]
-                  , Help "the IDs of the files to be removed, in hexidecimal"
+                  , Help "the IDs of the files to be removed, in hexadecimal"
                   , ArgHelp "Strings"
+                  ],
+    mixPath5   %> [ Short ['I']
+                  , Long ["Path"]
+                  , Help "the path to the Mix print information about"
+                  , ArgHelp "Path"
+                  , Required True
                   ]
     ]
 
@@ -117,15 +126,20 @@ instance RecordCommand Basic where
   run' cmd@(Create  {}) _ =
     do pred <- doesFileExist mPath
        new  <- dispatchReadFile3s mType =<< (liftM concat . mapM getDirContentsRecursive $ inputFiles cmd)
+       tmpF <- uncurry openBinaryTempFile $ splitFileName mPath
        nMix <- if pred
                then do old <- dispatchDecode `liftM` L.readFile mPath
                        return $ if isS
-                                then mergeSafeRecursiveFile3s old new
+                                then mergeSafeRecursiveFile3s
+                                     (mergeSafeRecursiveFile3s [] old)
+                                     $ new
                                 else mergeFile3s old new
                else return    $ if isS
                                 then mergeSafeRecursiveFile3s [] new
                                 else new
-       L.writeFile mPath $ dispatchEncode mType nMix
+       L.hPut (snd tmpF) $ dispatchEncode mType nMix
+       hClose $ snd tmpF
+       renameFile (fst tmpF) mPath
     where mType = mixType  cmd
           mPath = mixPath2 cmd
           isS   = safe cmd
@@ -137,19 +151,30 @@ instance RecordCommand Basic where
 
   run' cmd@(Remove  {}) _ =
     do mType <- liftM detect $ L.readFile mPath
-       (L.writeFile mPath . dispatchEncode mType
-        . filter (detectFile3s bNames $ map (fst . head . readHex) bIDs))
+       tmpF <- uncurry openBinaryTempFile $ splitFileName mPath
+
+       (L.hPut (snd tmpF) . dispatchEncode mType
+        . filter (not . detectFile3s bNames (map (fst . head . readHex) bIDs)))
          =<< liftM dispatchDecode (L.readFile mPath)
-    where
-          mPath  = mixPath4 cmd
+
+       hClose $ snd tmpF
+       renameFile (fst tmpF) mPath
+    where mPath  = mixPath4 cmd
           bIDs   = ids cmd
           bNames = names cmd
 
+  run' cmd@(Print   {}) _ =
+    do mix <- liftM dispatchDecode $ L.readFile mPath
+       putStrLn $ "File Count:" ++ show (length mix)
+       mapM_ (putStrLn . \(a,b) -> a ++ " " ++ b) $ showFileHeaders mix
+    where mPath  = mixPath5 cmd
 
-  mode_summary Test    {} = "probe a Mix archive to see what type it is."
-  mode_summary Create  {} = "create a new Mix archive."
-  mode_summary Extract {} = "extract files from a Mix."
-  mode_summary Remove  {} = "remove files from a Mix."
+
+  mode_summary Test    {} = "probe a Mix archive to see what type it is"
+  mode_summary Create  {} = "create a new Mix archive"
+  mode_summary Extract {} = "extract files from a Mix"
+  mode_summary Remove  {} = "remove files from a Mix"
+  mode_summary Print   {} = "print information about a Mix"
 
 
 main :: IO ()
@@ -159,3 +184,4 @@ main = do x <- getArgs
             cmd@(Create  {}) -> run' cmd x
             cmd@(Extract {}) -> run' cmd x
             cmd@(Remove  {}) -> run' cmd x
+            cmd@(Print   {}) -> run' cmd x
