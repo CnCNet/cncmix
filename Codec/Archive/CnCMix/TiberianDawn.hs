@@ -175,14 +175,6 @@ mixToFilesRaw m = map (\x -> CM.File3 [] (Codec.Archive.CnCMix.TiberianDawn.id x
     headToBS entry = L.take   (fromIntegral $ size entry)
                      . L.drop (fromIntegral $ offset entry)
 
-consFileMixRaw :: CM.File3 -> Mix -> Mix
-consFileMixRaw (CM.File3 [] fi fc) (Mix (TopHeader count size) entries contents) =
-  Mix (TopHeader (count+1) (size+fs))
-      (entries ++ [EntryHeader fi size fs])
-      $ L.append contents fc
-  where fs = fromIntegral $ L.length fc
-consFileMixRaw f@(CM.File3 (_:_) _ _) b = consFileMixRaw (updateFile3 f) b
-
 
 --
 -- Using Local Mix Databases
@@ -221,10 +213,6 @@ instance CM.Archive Mix where
   filesToArchive = filesToMixRaw . saveNames
 
   archiveToFiles = loadNames . mixToFilesRaw
-
-  cons a b = case testLMD $ b of
-    0 -> consFileMixRaw a b
-    _ -> CM.cons a b
 
 
 --

@@ -152,11 +152,3 @@ class (Binary a) => Archive a where
   -- | Creates a TAR archive containing a number of files
   filesToArchive :: [File3] -> a
   archiveToFiles :: a -> [File3]
-
-
-  cons :: File3 -> a -> a
-  cons f = filesToArchive . (f :) . archiveToFiles
-
-
-showFileNames :: [File3] -> [String]
-showFileNames = map (name :: File3 -> String)
