@@ -26,8 +26,7 @@ data Basic = Test    { mixPath1   :: FilePath
                      , outputDir  :: FilePath
                      }
            | Remove  { mixPath4   :: FilePath
-                     , names      :: [String]
-                     , ids        :: [String]
+                     , namesIds   :: [String]
                      }
            | Print   { mixPath5   :: FilePath
                      }
@@ -42,7 +41,6 @@ instance Attributes Basic where
                   , ArgHelp "Path"
                   , Required True
                   ],
-
     mixPath2   %> [ Short ['O']
                   , Long ["mix"]
                   , Help "the path to the Mix to be created"
@@ -65,7 +63,6 @@ instance Attributes Basic where
                   , Help "should CnCMix check for ID collisions?"
                   , Invertible True
                   ],
-
     mixPath3   %> [ Short ['I']
                   , Long ["mix"]
                   , Help "the path to the Mix to be extracted"
@@ -77,22 +74,17 @@ instance Attributes Basic where
                   , ArgHelp "Path"
                   , Required True
                   ],
-
     mixPath4   %> [ Short ['I']
                   , Long ["mix"]
                   , Help "the path to the Mix to be filtered"
                   , ArgHelp "Path"
                   , Required True
                   ],
-    names      %> [ Short ['n']
-                  , Long ["names"]
-                  , Help "the names of the files to be removed"
-                  , ArgHelp "Strings"
-                  ],
-    ids        %> [ Short ['i']
-                  , Long ["IDs"]
-                  , Help "the IDs of the files to be removed, in hexadecimal"
-                  , ArgHelp "Strings"
+    namesIds   %> [ Help $ "the name or ID of each file to be removed."
+                    ++ " IDs should be prefixed with \'0x\' and written in hexadecimal"
+                  , Extra True
+                  , ArgHelp "Names and IDs"
+                  , Required True
                   ],
     mixPath5   %> [ Short ['I']
                   , Long ["Path"]
@@ -103,7 +95,7 @@ instance Attributes Basic where
     ]
 
 
---  noAttributes = [Help $  "CnCMixer by Sonarpulse"
+--  noAttributes = [Help $ "CnCMixer by Sonarpulse"
 --                  ++ "\n" ++ "A simple tool to manipulate Mix archives of the older"
 --                  ++ "Command & Conquer Games, designed especially for automated use."
 --                  ++ "\n" ++ "source at http://github.com/Sonarpulse/CnC-Red-Alert"
@@ -132,7 +124,7 @@ instance RecordCommand Basic where
                        return $ if isS
                                 then mergeSafeRecursiveFile3s
                                      (mergeSafeRecursiveFile3s [] old)
-                                     $ new
+                                     new
                                 else mergeFile3s old new
                else return    $ if isS
                                 then mergeSafeRecursiveFile3s [] new
@@ -154,14 +146,13 @@ instance RecordCommand Basic where
        tmpF <- uncurry openBinaryTempFile $ splitFileName mPath
 
        (L.hPut (snd tmpF) . dispatchEncode mType
-        . filter (not . detectFile3s bNames (map (fst . head . readHex) bIDs)))
+        . flip removeFile3s (map (dispatchUpdateFile3 mType . \a -> File3 a 0 L.empty) rkeys))
          =<< liftM dispatchDecode (L.readFile mPath)
 
        hClose $ snd tmpF
        renameFile (fst tmpF) mPath
     where mPath  = mixPath4 cmd
-          bIDs   = ids cmd
-          bNames = names cmd
+          rkeys  = namesIds cmd
 
   run' cmd@(Print   {}) _ =
     do mix <- liftM dispatchDecode $ L.readFile mPath

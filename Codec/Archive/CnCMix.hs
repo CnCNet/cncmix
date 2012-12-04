@@ -67,6 +67,11 @@ dispatchReadFile3 t = manualDispatch t $ TD.readFile3
                       {- $ RA.readFile3  $ TS.readFile3
                          $ RA2.readFile3 $ Rg.readFile3 -}
 
+dispatchUpdateFile3 :: CnCGame-> File3 -> File3
+dispatchUpdateFile3 t = manualDispatch t $ TD.updateFile3
+                        {- $ RA.updateFile3  $ TS.updateFile3
+                           $ RA2.updateFile3 $ Rg.updateFile3 -}
+
 dispatchEncode :: CnCGame -> [File3] -> L.ByteString
 dispatchEncode t =
   case t of

@@ -38,25 +38,25 @@ data File3 = File3 { name     :: String
 
 
 readFile3 :: (String -> Word32) -> FilePath -> IO File3
-readFile3 f p = return . (updateFile3 f) . File3 shortname 0 =<< L.readFile p
+readFile3 f p = return . updateFile3 f . File3 shortname 0 =<< L.readFile p
   where shortname = takeFileName p
 
 readFile3s :: (String -> Word32) -> [FilePath] -> IO [File3]
 readFile3s f = S.mapM $ readFile3 f
 
 writeFile3 :: FilePath -> File3 -> IO ()
-writeFile3 p (File3 []      i c) = L.writeFile (p </> "0x" ++ showHex i "") $ c
-writeFile3 p (File3 n@(_:_) _ c) = L.writeFile (p </> n) $ c
+writeFile3 p (File3 []      i c) = L.writeFile (p </> "0x" ++ showHex i "") c
+writeFile3 p (File3 n@(_:_) _ c) = L.writeFile (p </> n) c
 
 writeFile3s :: FilePath -> [File3] -> IO ()
 writeFile3s = S.mapM_ . writeFile3
 
 removeFile3 :: [File3] -> File3 -> [File3]
-removeFile3 olds (File3 nn ni _) = filter (detectFile3 nn ni) olds
+removeFile3 olds (File3 nn ni _) = filter (not . detectFile3 nn ni) olds
 
 removeFile3s :: [File3] -> [File3] -> [File3]
-removeFile3s olds news = filter (detectFile3s (map name news)
-                                 $ map Codec.Archive.CnCMix.Backend.id news)
+removeFile3s olds news = filter (not . detectFile3s (map name news)
+                                 (map Codec.Archive.CnCMix.Backend.id news))
                          olds
 
 mergeFile3s ::[File3] -> [File3] -> [File3]
@@ -72,7 +72,7 @@ updateMetadataFile3s :: [File3] -> [File3] -> [File3]
 updateMetadataFile3s = combineFile3sGeneric combineSafeFile3 False
 
 mergeSafeRecursiveFile3s :: [File3] -> [File3] -> [File3]
-mergeSafeRecursiveFile3s a = foldl mergeFile3 a
+mergeSafeRecursiveFile3s = foldl mergeFile3
 
 --
 -- Plumbing File Operators
@@ -83,8 +83,8 @@ detectFile3 n i x = (i == Codec.Archive.CnCMix.Backend.id x)
                     || (n == name x)
 
 detectFile3s :: [String] -> [Word32] -> File3 -> Bool
-detectFile3s n i x = (or $ map (== Codec.Archive.CnCMix.Backend.id x) i)
-                    || (or $ map (== name x) n)
+detectFile3s n i x = elem (Codec.Archive.CnCMix.Backend.id x) i
+                    || elem (name x) n
 
 combineDestructiveFile3 :: File3 -> File3 -> Maybe File3
 combineDestructiveFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
@@ -116,8 +116,8 @@ combineFile3sGeneric _ True  k  [] = k
 combineFile3sGeneric _ False _  [] = []
 combineFile3sGeneric _ _     [] k  = k
 combineFile3sGeneric f b old new  = case partitionEithers $ map (maybeToEither $ f hO) new of
-  (x, y@(_:_)) -> (foldl (\a -> fromJust . f a) hO y) : combineFile3sGeneric f b tO x
-  (_:_, [])    -> hO                                  : combineFile3sGeneric f b tO new
+  (x, y@(_:_)) -> foldl (\a -> fromJust . f a) hO y : combineFile3sGeneric f b tO x
+  (_:_, [])    -> hO                                : combineFile3sGeneric f b tO new
   where hN = head new; tN = tail new
         hO = head old; tO = tail old
 
@@ -127,7 +127,7 @@ maybeToEither f a = case f a of
   Just b  -> Right b
 
 updateFile3 :: (String -> Word32) -> File3 -> File3
-updateFile3 _ (File3 [] i c) = (File3 [] i c)
+updateFile3 _ (File3 [] i c) = File3 [] i c
 updateFile3 _ (File3 ('0':'x':s) i c)
   | i == 0    = File3 [] i' c
   | i == i'   = File3 [] i' c
