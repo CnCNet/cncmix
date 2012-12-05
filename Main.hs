@@ -15,7 +15,9 @@ import Codec.Archive.CnCMix
 import Codec.Archive.CnCMix.Backend
 
 
-data Basic = Test    { mixPath1   :: FilePath
+data Basic = Info    { mixPath1   :: FilePath
+                     , lType      :: Bool
+                     , lCont      :: Bool
                      }
            | Create  { mixPath2   :: FilePath
                      , inputFiles :: [FilePath]
@@ -28,8 +30,6 @@ data Basic = Test    { mixPath1   :: FilePath
            | Remove  { mixPath4   :: FilePath
                      , namesIds   :: [String]
                      }
-           | Print   { mixPath5   :: FilePath
-                     }
            deriving (Typeable, Data, Eq)
 
 
@@ -37,10 +37,23 @@ instance Attributes Basic where
   attributes _ = group "Options" [
     mixPath1   %> [ Short ['I']
                   , Long ["mix"]
-                  , Help "the path to the Mix to test"
+                  , Help "the path to the Mix print information about"
                   , ArgHelp "Path"
                   , Required True
                   ],
+    lType      %> [ Short ['t']
+                  , Long  ["print-type"]
+                  , Help "Should CnCMix print the type of Mix?"
+                  , Invertible True
+                  , Default True
+                  ],
+    lCont      %> [ Short ['c']
+                  , Long  ["list-files"]
+                  , Help "Should CnCMix print a list of the Mix's content?"
+                  , Invertible True
+                  , Default True
+                  ],
+    ---------------
     mixPath2   %> [ Short ['O']
                   , Long ["mix"]
                   , Help "the path to the Mix to be created"
@@ -63,6 +76,7 @@ instance Attributes Basic where
                   , Help "should CnCMix check for ID collisions?"
                   , Invertible True
                   ],
+    ---------------
     mixPath3   %> [ Short ['I']
                   , Long ["mix"]
                   , Help "the path to the Mix to be extracted"
@@ -74,6 +88,7 @@ instance Attributes Basic where
                   , ArgHelp "Path"
                   , Required True
                   ],
+    ---------------
     mixPath4   %> [ Short ['I']
                   , Long ["mix"]
                   , Help "the path to the Mix to be filtered"
@@ -84,12 +99,6 @@ instance Attributes Basic where
                     ++ " IDs should be prefixed with \'0x\' and written in hexadecimal"
                   , Extra True
                   , ArgHelp "Names and IDs"
-                  , Required True
-                  ],
-    mixPath5   %> [ Short ['I']
-                  , Long ["Path"]
-                  , Help "the path to the Mix print information about"
-                  , ArgHelp "Path"
                   , Required True
                   ]
     ]
@@ -112,8 +121,14 @@ getDirContentsRecursive p =
 
 
 instance RecordCommand Basic where
-  run' cmd@(Test    {}) _ = putStrLn =<< liftM (show . detect) (L.readFile mPath)
-    where mPath = mixPath1 cmd
+  run' cmd@(Info    {}) _ =
+    do when sType $ putStrLn . ("Mix Type: " ++) =<< liftM (show . detect) (L.readFile mPath)
+       when sCont $ do putStrLn . ("File Count: " ++) . show . length =<< mix
+                       mapM_ (putStrLn . \(a,b) -> a ++ " " ++ b) . showFileHeaders =<< mix
+    where sType = lType cmd
+          sCont = lCont cmd
+          mPath = mixPath1 cmd
+          mix   = liftM dispatchDecode $ L.readFile mPath
 
   run' cmd@(Create  {}) _ =
     do pred <- doesFileExist mPath
@@ -154,25 +169,17 @@ instance RecordCommand Basic where
     where mPath  = mixPath4 cmd
           rkeys  = namesIds cmd
 
-  run' cmd@(Print   {}) _ =
-    do mix <- liftM dispatchDecode $ L.readFile mPath
-       putStrLn $ "File Count:" ++ show (length mix)
-       mapM_ (putStrLn . \(a,b) -> a ++ " " ++ b) $ showFileHeaders mix
-    where mPath  = mixPath5 cmd
 
-
-  mode_summary Test    {} = "probe a Mix archive to see what type it is"
+  mode_summary Info    {} = "print information about a Mix"
   mode_summary Create  {} = "create a new Mix archive"
   mode_summary Extract {} = "extract files from a Mix"
   mode_summary Remove  {} = "remove files from a Mix"
-  mode_summary Print   {} = "print information about a Mix"
 
 
 main :: IO ()
 main = do x <- getArgs
           dispatchR [] x >>= \y -> case y of
-            cmd@(Test    {}) -> run' cmd x
+            cmd@(Info    {}) -> run' cmd x
             cmd@(Create  {}) -> run' cmd x
             cmd@(Extract {}) -> run' cmd x
             cmd@(Remove  {}) -> run' cmd x
-            cmd@(Print   {}) -> run' cmd x
