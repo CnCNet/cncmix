@@ -60,16 +60,16 @@ removeFile3s olds news = filter (not . detectFile3s (map name news)
                          olds
 
 mergeFile3s ::[File3] -> [File3] -> [File3]
-mergeFile3s = combineFile3sGeneric combineDestructiveFile3 True
+mergeFile3s = combineFile3sGeneric combineNoCollideFile3 True
 
 mergeSymmetricFile3s :: [File3] -> [File3] -> [File3]
-mergeSymmetricFile3s = combineFile3sGeneric combineSafeFile3 True
+mergeSymmetricFile3s = combineFile3sGeneric combineNoDestroyFile3 True
 
 mergeFile3 :: [File3] -> File3 -> [File3]
 mergeFile3 olds new = mergeFile3s olds [new]
 
 updateMetadataFile3s :: [File3] -> [File3] -> [File3]
-updateMetadataFile3s = combineFile3sGeneric combineSafeFile3 False
+updateMetadataFile3s = combineFile3sGeneric combineNoDestroyFile3 False
 
 mergeSafeRecursiveFile3s :: [File3] -> [File3] -> [File3]
 mergeSafeRecursiveFile3s = foldl mergeFile3
@@ -79,27 +79,30 @@ mergeSafeRecursiveFile3s = foldl mergeFile3
 --
 
 detectFile3 :: String -> Word32 -> File3 -> Bool
-detectFile3 n i x = (i == Codec.Archive.CnCMix.Backend.id x)
-                    || (n == name x)
+detectFile3 n i x = (fName /= [] && n == fName)
+                    || (fId /= 0 && i == fId)
+  where fId   = Codec.Archive.CnCMix.Backend.id x
+        fName = name x
 
 detectFile3s :: [String] -> [Word32] -> File3 -> Bool
-detectFile3s n i x = elem (Codec.Archive.CnCMix.Backend.id x) i
-                    || elem (name x) n
+detectFile3s n i x = (fName /= [] && elem fName n && n /= [])
+                     || (fId /= 0 && elem fId i)
+  where fId   = Codec.Archive.CnCMix.Backend.id x
+        fName = name x
 
-combineDestructiveFile3 :: File3 -> File3 -> Maybe File3
-combineDestructiveFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
-  case results of
-    (Just a, Just b) -> Just $ File3 a b c1
-    (_, _)           -> Nothing
-  where results = (cF n1 n2 [], cF i1 i2 0)
-        cF a b base
-          | a == base = Just b
-          | b == base = Just a
-          | a == b    = Just b
-          | otherwise = Nothing
+combineNoCollideFile3 :: File3 -> File3 -> Maybe File3
+combineNoCollideFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
+  if i1 == i2
+  then Just $ File3 (cF n1 n2 []) i2 $ cF c1 c2 L.empty
+  else Nothing
+  where cF a b base
+          | a == base = b
+          | b == base = a
+          | a == b    = b
+          | otherwise = b
 
-combineSafeFile3 :: File3 -> File3 -> Maybe File3
-combineSafeFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
+combineNoDestroyFile3 :: File3 -> File3 -> Maybe File3
+combineNoDestroyFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
   case results of
     (Just a, Just b, Just c) -> Just $ File3 a b c
     (_, _, _)                -> Nothing
