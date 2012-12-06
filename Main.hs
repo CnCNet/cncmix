@@ -19,13 +19,14 @@ data Basic = Info    { mixPath1  :: FilePath
                      , lType     :: Bool
                      , lCont     :: Bool
                      }
-           | Mod     { mixPath2  :: FilePath
+           | Mod     { mixIn     :: FilePath
+                     , mixOut    :: FilePath
                      , addFs     :: [FilePath]
                      , rmFs      :: [String]
                      , mixType   :: CnCGame
                      , safe      :: Bool
                      }
-           | Extract { mixPath3  :: FilePath
+           | Extract { mixPath2  :: FilePath
                      , outputDir :: FilePath
                      }
            deriving (Typeable, Data, Eq)
@@ -38,6 +39,7 @@ instance Attributes Basic where
                  , Help "the path to the Mix print information about"
                  , ArgHelp "Path"
                  , Required True
+                 , Extra True
                  ],
     lType     %> [ Short ['t']
                  , Long  ["print-type"]
@@ -52,12 +54,17 @@ instance Attributes Basic where
                  , Default True
                  ],
     -------------
-    mixPath2 %> [ Short ['O']
-                , Long ["mix"]
-                , Help "the path to the Mix to be created or modified"
-                , ArgHelp "Path"
-                , Required True
-                ],
+    mixOut    %> [ Short ['O']
+                 , Long ["output-mix"]
+                 , Help "the path to the Mix to read from"
+                 , ArgHelp "Path"
+                 , Required True
+                 ],
+    mixIn     %> [ Short ['I']
+                 , Long ["input-mix"]
+                 , Help "the path to write the mix to"
+                 , ArgHelp "Path"
+                 ],
     addFs     %> [ Short ['a']
                  , Long ["add"]
                  ,  Help "the files from which to create the Mix. Folders will be recurred into"
@@ -80,7 +87,7 @@ instance Attributes Basic where
                  , Invertible True
                  ],
     --------------
-    mixPath3  %> [ Short ['I']
+    mixPath2  %> [ Short ['I']
                  , Long ["mix"]
                  , Help "the path to the Mix to be extracted"
                  , ArgHelp "Path"
@@ -121,33 +128,40 @@ instance RecordCommand Basic where
           mix   = liftM dispatchDecode $ L.readFile mPath
 
   run' cmd@(Mod {}) _ =
-    do pred <- doesFileExist mPath
+    do temP <- doesFileExist mIn -- | if mIn exists
+           -- | if mIn is specified and valid
+       let inP  = mIn /= [] && (temP || error "input Mix does not exist")
+           -- | if mIn and mOut are the same (and mIn is valid)
+           colP = inP && mIn == mOut
        aFs  <- dispatchReadFile3s mType =<< (liftM concat . mapM getDirContentsRecursive $ addFs cmd)
-       tmpF <- uncurry openBinaryTempFile $ splitFileName mPath
-       nMix <- if pred
-               then do old <- dispatchDecode `liftM` L.readFile mPath
-                       mid <- return $ if isS
-                                       then mergeSafeRecursiveFile3s
-                                            (mergeSafeRecursiveFile3s [] old)
-                                            aFs
-                                       else mergeFile3s old aFs
+       tmpF <- if colP
+               then uncurry openBinaryTempFile $ splitFileName mOut
+               else liftM ((,) []) $ openBinaryFile mOut WriteMode
+       nMix <- if inP
+               then do old <- dispatchDecode `liftM` L.readFile mIn
+                       let mid = if isS
+                                 then mergeSafeRecursiveFile3s
+                                      (mergeSafeRecursiveFile3s [] old)
+                                      aFs
+                                 else mergeFile3s old aFs
                        return $ removeFile3s mid
                          $ map (dispatchUpdateFile3 mType . \a -> File3 a 0 L.empty) rFs
-               else return  $ if isS
-                              then mergeSafeRecursiveFile3s [] aFs
-                              else aFs
+                  else return  $ if isS
+                                 then mergeSafeRecursiveFile3s [] aFs
+                                 else aFs
        L.hPut (snd tmpF) $ dispatchEncode mType nMix
        hClose $ snd tmpF
-       renameFile (fst tmpF) mPath
+       when colP $ renameFile (fst tmpF) mOut
     where mType = mixType  cmd
-          mPath = mixPath2 cmd
+          mOut  = mixOut   cmd
+          mIn   = mixIn    cmd
           rFs   = rmFs     cmd
           isS   = safe     cmd
 
   run' cmd@(Extract {}) _ = writeFile3s oDir
                             =<< liftM dispatchDecode (L.readFile mPath)
     where oDir  = outputDir cmd
-          mPath = mixPath3  cmd
+          mPath = mixPath2  cmd
 
 
   mode_summary Info    {} = "print information about a Mix"
