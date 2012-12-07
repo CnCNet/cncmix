@@ -39,7 +39,6 @@ instance Attributes Basic where
                  , Help "the path to the Mix print information about"
                  , ArgHelp "Path"
                  , Required True
-                 , Extra True
                  ],
     lType     %> [ Short ['t']
                  , Long  ["print-type"]
