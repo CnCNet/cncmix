@@ -1,13 +1,31 @@
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable #-}
-module Codec.Archive.CnCMix where
---       (
---         File
---       , name
---       , contents
---         --, Mix
---       ) where
+module Codec.Archive.CnCMix
+       (CnCGame ( TiberianDawn
+		, RedAlert
+		, TiberianSun
+		, RedAlert2
+		, Renegade
+		)
+       , detectGame
+       , dispatchDecode
+       , dispatchReadL
+       , dispatchUpdate
+       , dispatchEncode
+	 -- fowarding generic
+       , File3(contents)
+       , F.writeL
+       , F.removeL
+       , F.mergeL
+       , F.mergeSafeRecursiveL
+       , F.showHeaders
+       , F.Archive
+       ) where
 
+import qualified Codec.Archive.CnCMix.Backend as F
 import Codec.Archive.CnCMix.Backend
+  (File3(File3)
+   , filesToArchive
+   , archiveToFiles)
 
 import qualified Codec.Archive.CnCMix.TiberianDawn as TD
 --import qualified Codec.Archive.CnCMix.RedAlert     as RA
@@ -36,14 +54,14 @@ import qualified Control.Monad as S
 
 
 data CnCGame = TiberianDawn
-             | RedAlert
-             | TiberianSun
-             | RedAlert2
-             | Renegade
-             deriving (Data, Eq, Ord, Show, Read, Bounded, Enum, Typeable)
+	     | RedAlert
+	     | TiberianSun
+	     | RedAlert2
+	     | Renegade
+	     deriving (Data, Eq, Ord, Show, Read, Bounded, Enum, Typeable)
 
-detect :: L.ByteString -> CnCGame
-detect a = case runGet getWord32le a of
+detectGame :: L.ByteString -> CnCGame
+detectGame a = case runGet getWord32le a of
   0x00010000 -> RedAlert
   0x00020000 -> RedAlert
   _          -> TiberianDawn
@@ -52,30 +70,30 @@ manualDispatch :: CnCGame -> t -> t
 manualDispatch t f1 {-f2 f3 f4 f5-} =
   case t of
     TiberianDawn -> f1
-    --RedAlert     -> TD.readFile3s
-    --TiberianSun  -> TD.readFile3s
-    --RedAlert2    -> TD.readFile3s
-    --Renegade     -> TD.readFile3s
+    --RedAlert     -> TD.readL
+    --TiberianSun  -> TD.readL
+    --RedAlert2    -> TD.readL
+    --Renegade     -> TD.readL
 
-dispatchReadFile3s :: CnCGame -> [FilePath] -> IO [File3]
-dispatchReadFile3s t = manualDispatch t $ TD.readFile3s
-                       {- $ RA.readFile3s  $ TS.readFile3s
-                          $ RA2.readFile3s $ Rg.readFile3s -}
+dispatchReadL :: CnCGame -> [FilePath] -> IO [File3]
+dispatchReadL t = manualDispatch t $ TD.readL
+		       {- $ RA.readL  $ TS.readL
+			  $ RA2.readL $ Rg.readL -}
 
-dispatchReadFile3 :: CnCGame -> FilePath -> IO File3
-dispatchReadFile3 t = manualDispatch t $ TD.readFile3
-                      {- $ RA.readFile3  $ TS.readFile3
-                         $ RA2.readFile3 $ Rg.readFile3 -}
+dispatchRead :: CnCGame -> FilePath -> IO File3
+dispatchRead t = manualDispatch t $ TD.read
+		 {- $ RA.read  $ TS.read
+		    $ RA2.read $ Rg.read -}
 
-dispatchUpdateFile3 :: CnCGame-> File3 -> File3
-dispatchUpdateFile3 t = manualDispatch t $ TD.updateFile3
-                        {- $ RA.updateFile3  $ TS.updateFile3
-                           $ RA2.updateFile3 $ Rg.updateFile3 -}
+dispatchUpdate :: CnCGame-> File3 -> File3
+dispatchUpdate t = manualDispatch t $ TD.update
+		   {- $ RA.updatexFile3  $ TS.update
+		      $ RA2.update $ Rg.update -}
 
 dispatchEncode :: CnCGame -> [File3] -> L.ByteString
 dispatchEncode t =
   case t of
-    TiberianDawn -> encode . (filesToArchive :: [File3] -> TD.Mix)
+    TiberianDawn -> encode .   (filesToArchive :: [File3] -> TD.Mix)
     --RedAlert     -> encode . (filesToArchive :: [File3] -> RA.Mix)
     --TiberianSun  -> encode . (filesToArchive :: [File3] -> TS.Mix)
     --RedAlert2    -> encode . (filesToArchive :: [File3] -> RA2.Mix)
@@ -83,7 +101,7 @@ dispatchEncode t =
 
 dispatchDecode :: L.ByteString -> [File3]
 dispatchDecode b =
-  case (detect b) of
+  case (detectGame b) of
     TiberianDawn -> archiveToFiles $ (decode b :: TD.Mix)
     --RedAlert     -> archiveToFiles $ (decode b :: RA.Mix)
     --TiberianSun  -> archiveToFiles $ (decode b :: TS.Mix)
