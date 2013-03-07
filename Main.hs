@@ -14,12 +14,13 @@ import Control.Monad
 import qualified Codec.Archive.CnCMix as F
 import Codec.Archive.CnCMix
   (CnCGame ( TiberianDawn
-           , RedAlert
-           , TiberianSun
-           , RedAlert2
-           , Renegade
-           ))
-
+	   , RedAlert_Normal
+	   --, RedAlert_Encrypted
+	   --, RedAlert_Checksummed
+	   --, TiberianSun
+	   --, RedAlert2
+	   --, Renegade
+	   ))
 import Codec.Archive.CnCMix.Backend
   (File3(File3))
 
