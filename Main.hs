@@ -47,7 +47,7 @@ instance Attributes Basic where
   attributes _ = group "Options" [
     mixPath1  %> [ Short ['I']
                  , Long ["mix"]
-                 , Help "the path to the Mix print information about"
+                 , Help "the path to the Mix to print information about"
                  , ArgHelp "Path"
                  , Required True
                  ],
@@ -66,18 +66,18 @@ instance Attributes Basic where
     -------------
     mixOut    %> [ Short ['O']
                  , Long ["output-mix"]
-                 , Help "the path to the Mix to read from"
+                 , Help "the path to write the mix to"
                  , ArgHelp "Path"
                  , Required True
                  ],
     mixIn     %> [ Short ['I']
                  , Long ["input-mix"]
-                 , Help "the path to write the mix to"
+                 , Help "the path to read the mix to"
                  , ArgHelp "Path"
                  ],
     addFs     %> [ Short ['a']
                  , Long ["add"]
-                 ,  Help "the files from which to create the Mix. Folders will be recurred into"
+                 , Help "the files used to create or modify the Mix. Folders will be recurred into"
                  , ArgHelp "Paths"
                  ],
     rmFs      %> [ Short ['d']
@@ -104,7 +104,7 @@ instance Attributes Basic where
                  , Required True
                  ],
     outputDir %> [ Short ['O']
-                 , Help "the directory into which to extract the files"
+                 , Help "the directory to extract the files into"
                  , ArgHelp "Path"
                  , Required True
                  ]
@@ -128,18 +128,22 @@ getDirContentsRecursive p =
 
 
 instance RecordCommand Basic where
-  run' cmd@(Info {}) _ =
+  run' Info  { lType    = sType
+             , lCont    = sCont
+             , mixPath1 = mPath } _ =
     do when sType $ putStrLn . ("Mix Type:\t" ++) =<< liftM (show . F.detectGame) (L.readFile mPath)
        when sCont $ do putStrLn . ("File Count:\t" ++) . show . length =<< mix
                        putStrLn ""
                        putStrLn $ "Names:  \t" ++ "IDs:"
                        mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) . F.showHeaders =<< mix
-    where sType = lType    cmd
-          sCont = lCont    cmd
-          mPath = mixPath1 cmd
-          mix   = liftM F.dispatchDecode $ L.readFile mPath
+    where mix = liftM F.dispatchDecode $ L.readFile mPath
 
-  run' cmd@(Mod {}) _ =
+  run' cmd@(Mod { mixType = mType
+                , mixOut  = mOut
+                , mixIn   = mIn
+                , rmFs    = rFs
+                , safe    = isS
+                }) _ =
     do temP <- doesFileExist mIn -- if mIn exists
            -- if mIn is specified and valid
        let inP  = mIn /= [] && (temP || error "input Mix does not exist")
@@ -164,16 +168,10 @@ instance RecordCommand Basic where
        L.hPut (snd tmpF) $ F.dispatchEncode mType nMix
        hClose $ snd tmpF
        when colP $ renameFile (fst tmpF) mOut
-    where mType = mixType  cmd
-          mOut  = mixOut   cmd
-          mIn   = mixIn    cmd
-          rFs   = rmFs     cmd
-          isS   = safe     cmd
 
-  run' cmd@(Extract {}) _ = F.writeL oDir
-                            =<< liftM F.dispatchDecode (L.readFile mPath)
-    where oDir  = outputDir cmd
-          mPath = mixPath2  cmd
+  run' Extract { outputDir = oDir
+               , mixPath2  = mPath} _ =
+    F.writeL oDir =<< liftM F.dispatchDecode (L.readFile mPath)
 
 
   mode_summary Info    {} = "print information about a Mix"
@@ -182,8 +180,6 @@ instance RecordCommand Basic where
 
 
 main :: IO ()
-main = do x <- getArgs
-          dispatchR [] x >>= \y -> case y of
-            cmd@(Info    {}) -> run' cmd x
-            cmd@(Mod     {}) -> run' cmd x
-            cmd@(Extract {}) -> run' cmd x
+main = parse =<< getArgs
+  where parse :: [String] -> IO ()
+        parse x = dispatchR [] x >>= (flip run' x :: Basic -> IO ())
