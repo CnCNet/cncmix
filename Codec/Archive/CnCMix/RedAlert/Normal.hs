@@ -18,6 +18,8 @@ import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
 
+--import Foreign.Storable (sizeOf)
+
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
@@ -30,7 +32,7 @@ newtype Mix = Mix TD.Mix
 --
 
 instance Binary Mix where
-  get = do skip 32
+  get = do skip 4 -- $ sizeOf (0 :: Word32)
            S.liftM Mix $ get
 
   put (Mix tdmix) = do putWord32le $ fromIntegral 0

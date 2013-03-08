@@ -1,4 +1,9 @@
-module Codec.Archive.CnCMix.LocalMixDatabase where
+module Codec.Archive.CnCMix.LocalMixDatabase
+       ( LocalMixDatabase ( LocalMixDatabase
+                          , getLMD
+                          )
+       ,
+       ) where
 
 import Data.Word
 import Data.Int
@@ -19,7 +24,7 @@ import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
 
-data LocalMixDatabase = LocalMixDatabase { getLMD :: [[Char]] }
+newtype LocalMixDatabase = LocalMixDatabase { getLMD :: [[Char]] }
 
 putAsCString s = do putLazyByteString $ C.pack s
                     putWord8 0x0
