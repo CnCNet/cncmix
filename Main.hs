@@ -1,22 +1,12 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
 module Main(main) where
-
-import qualified Data.ByteString.Lazy as L
-
-import Numeric
-
-import System.IO
-import System.FilePath
-import System.Directory
-import System.Console.CmdLib
-import Control.Monad
 
 import qualified Codec.Archive.CnCMix as F
 import Codec.Archive.CnCMix
   (CnCGame ( TiberianDawn
 	   , RedAlert_Normal
-	   --, RedAlert_Encrypted
-	   --, RedAlert_Checksummed
+           , RedAlert_Encrypted
+	   , RedAlert_Checksummed
 	   --, TiberianSun
 	   --, RedAlert2
 	   --, Renegade
@@ -24,6 +14,17 @@ import Codec.Archive.CnCMix
 import Codec.Archive.CnCMix.Backend
   (File3(File3))
 
+import System.IO
+import System.FilePath
+import System.Directory
+import System.Console.CmdLib
+import Control.Monad
+
+import qualified Data.ByteString.Lazy as L
+
+-- so we don't need extensions in cncmix proper
+deriving instance Data     CnCGame
+deriving instance Typeable CnCGame
 
 data Basic = Info    { mixPath1  :: FilePath
 		     , lType     :: Bool

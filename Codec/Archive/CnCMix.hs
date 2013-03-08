@@ -1,9 +1,8 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, DeriveDataTypeable #-}
 module Codec.Archive.CnCMix
        (CnCGame ( TiberianDawn
 		, RedAlert_Normal
-                --, RedAlert_Encrypted
-                --, RedAlert_Checksummed
+                , RedAlert_Encrypted
+                , RedAlert_Checksummed
 		--, TiberianSun
 		--, RedAlert2
 		--, Renegade
@@ -37,20 +36,10 @@ import qualified Codec.Archive.CnCMix.RedAlert.Normal       as RAN
 --import qualified Codec.Archive.CnCMix.RedAlert2             as RA2
 --import qualified Codec.Archive.CnCMix.Renegade              as Rg
 
-
-import Data.Word
-import Data.Int
-import Data.Bits
-import Data.Char
-
-import Numeric
-
-import System.FilePath
 import qualified Data.ByteString.Lazy as L
 
 import Data.Binary
 import Data.Binary.Get
-import Data.Binary.Put
 
 import System.Console.CmdLib
 import qualified Control.Monad as S
@@ -61,10 +50,10 @@ data CnCGame = TiberianDawn
              | RedAlert_Normal
              | RedAlert_Encrypted
              | RedAlert_Checksummed
-	     | TiberianSun
-	     | RedAlert2
-	     | Renegade
-	     deriving (Data, Eq, Ord, Show, Read, Bounded, Enum, Typeable)
+	     --- | TiberianSun
+	     --- | RedAlert2
+	     --- | Renegade
+	     deriving (Eq, Ord, Show, Read, Bounded, Enum)
 
 detectGame :: L.ByteString -> CnCGame
 detectGame a = case runGet getWord32le a of

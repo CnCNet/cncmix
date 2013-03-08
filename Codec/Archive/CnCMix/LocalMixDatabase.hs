@@ -5,20 +5,14 @@ module Codec.Archive.CnCMix.LocalMixDatabase
        ,
        ) where
 
-import Data.Word
-import Data.Int
-import Data.Bits
-import Data.Char
-
-import Numeric
-
-import System.FilePath
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as C
 
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
+
+--import Foreign.Storable (sizeOf)
 
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
@@ -32,8 +26,8 @@ putAsCString s = do putLazyByteString $ C.pack s
 lengthLMD l = (foldl (\o n ->o + length n) 0 l) + length l + 52
 
 instance Binary LocalMixDatabase where
-  get = do skip 32 --Static info
-           skip 16 --total size
+  get = do skip 32 -- $ sizeOf (0 :: Word8) * 32  -- Static info
+           skip 16 -- $ sizeOf (0 :: Word64) * 2  -- total size
            count <- getWord32le
            return . LocalMixDatabase =<<
              (S.replicateM (fromIntegral count) $ S.liftM C.unpack getLazyByteStringNul)

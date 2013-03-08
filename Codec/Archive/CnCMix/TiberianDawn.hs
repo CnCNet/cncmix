@@ -13,14 +13,10 @@ import Codec.Archive.CnCMix.Backend (File3(File3))
 
 import Codec.Archive.CnCMix.LocalMixDatabase
 
-import Data.Word
 import Data.Int
 import Data.Bits
 import Data.Char
 
-import Numeric
-
-import System.FilePath
 import qualified Data.ByteString.Lazy as L
 
 import Data.Binary
