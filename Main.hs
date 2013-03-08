@@ -129,9 +129,11 @@ getDirContentsRecursive p =
 
 instance RecordCommand Basic where
   run' cmd@(Info {}) _ =
-    do when sType $ putStrLn . ("Mix Type: " ++) =<< liftM (show . F.detectGame) (L.readFile mPath)
-       when sCont $ do putStrLn . ("File Count: " ++) . show . length =<< mix
-                       mapM_ (putStrLn . \(a,b) -> a ++ " " ++ b) . F.showHeaders =<< mix
+    do when sType $ putStrLn . ("Mix Type:\t" ++) =<< liftM (show . F.detectGame) (L.readFile mPath)
+       when sCont $ do putStrLn . ("File Count:\t" ++) . show . length =<< mix
+                       putStrLn ""
+                       putStrLn $ "Names:  \t" ++ "IDs:"
+                       mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) . F.showHeaders =<< mix
     where sType = lType    cmd
           sCont = lCont    cmd
           mPath = mixPath1 cmd
