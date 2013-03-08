@@ -1,8 +1,8 @@
 module Codec.Archive.CnCMix.Backend
        ( File3 ( File3
-	       , name
-	       , contents
-	       )
+               , name
+               , contents
+               )
        , read
        , readL
        , writeL
@@ -42,9 +42,9 @@ import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
 data File3 = File3 { name     :: String
-		   , id       :: Word32
-		   , contents :: L.ByteString }
-	   deriving (Show, Read, Eq)
+                   , id       :: Word32
+                   , contents :: L.ByteString }
+           deriving (Show, Read, Eq)
 
 
 --
@@ -71,8 +71,8 @@ remove olds (File3 nn ni _) = filter (not . detect nn ni) olds
 
 removeL :: [File3] -> [File3] -> [File3]
 removeL olds news = filter (not . detectL (map name news)
-				 (map id news))
-			 olds
+                                 (map id news))
+                         olds
 
 mergeL ::[File3] -> [File3] -> [File3]
 mergeL = combineFile3LGeneric combineNoCollideFile3 True
@@ -95,15 +95,15 @@ mergeSafeRecursiveL = foldl mergeFile3
 
 detect :: String -> Word32 -> File3 -> Bool
 detect n i x = (fName /= [] && n == fName)
-		    || (fId /= 0 && i == fId)
+                    || (fId /= 0 && i == fId)
   where fId   = id x
-	fName = name x
+        fName = name x
 
 detectL :: [String] -> [Word32] -> File3 -> Bool
 detectL n i x = (fName /= [] && elem fName n && n /= [])
-		     || (fId /= 0 && elem fId i)
+                     || (fId /= 0 && elem fId i)
   where fId   = id x
-	fName = name x
+        fName = name x
 
 combineNoCollideFile3 :: File3 -> File3 -> Maybe File3
 combineNoCollideFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
@@ -111,10 +111,10 @@ combineNoCollideFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
   then Just $ File3 (cF n1 n2 []) i2 $ cF c1 c2 L.empty
   else Nothing
   where cF a b base
-	  | a == base = b
-	  | b == base = a
-	  | a == b    = b
-	  | otherwise = b
+          | a == base = b
+          | b == base = a
+          | a == b    = b
+          | otherwise = b
 
 combineNoDestroyFile3 :: File3 -> File3 -> Maybe File3
 combineNoDestroyFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
@@ -122,14 +122,14 @@ combineNoDestroyFile3 (File3 n1 i1 c1) (File3 n2 i2 c2) =
     (Just a, Just b, Just c) -> Just $ File3 a b c
     (_, _, _)                -> Nothing
   where results = (cF n1 n2 [], cF i1 i2 0, cF c1 c2 L.empty)
-	cF a b base
-	  | a == base = Just b
-	  | b == base = Just a
-	  | a == b    = Just b
-	  | otherwise = Nothing
+        cF a b base
+          | a == base = Just b
+          | b == base = Just a
+          | a == b    = Just b
+          | otherwise = Nothing
 
 combineFile3LGeneric :: (File3 -> File3 -> Maybe File3)
-			-> Bool -> [File3] -> [File3] -> [File3]
+                        -> Bool -> [File3] -> [File3] -> [File3]
 combineFile3LGeneric _ True  k  [] = k
 combineFile3LGeneric _ False _  [] = []
 combineFile3LGeneric _ _     [] k  = k
@@ -137,7 +137,7 @@ combineFile3LGeneric f b old new  = case partitionEithers $ map (maybeToEither $
   (x, y@(_:_)) -> foldl (\a -> fromJust . f a) hO y : combineFile3LGeneric f b tO x
   (_:_, [])    -> hO                                : combineFile3LGeneric f b tO new
   where hN = head new; tN = tail new
-	hO = head old; tO = tail old
+        hO = head old; tO = tail old
 
 maybeToEither :: (a -> Maybe b) -> a -> Either a b
 maybeToEither f a = case f a of

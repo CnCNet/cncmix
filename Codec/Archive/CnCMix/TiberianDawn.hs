@@ -87,9 +87,9 @@ stringToWord32 :: Int -> Word32 -> [Char] -> Word32
 stringToWord32 4     accum _      = accum
 stringToWord32 _     accum []     = accum
 stringToWord32 count accum (x:xs) = stringToWord32
-				    (count + 1)
-				    (accum + shiftL (asciiCharToWord32 x) (count*8))
-				    xs
+                                    (count + 1)
+                                    (accum + shiftL (asciiCharToWord32 x) (count*8))
+                                    xs
 
 asciiCharToWord32 :: Char -> Word32
 asciiCharToWord32 c
@@ -119,32 +119,32 @@ update = F.update stringToId
 
 instance Binary TopHeader where
   get = do a <- getWord16le
-	   b <- getWord32le
-	   return $ TopHeader (fromIntegral a) $ fromIntegral b
+           b <- getWord32le
+           return $ TopHeader (fromIntegral a) $ fromIntegral b
 
   put (TopHeader a b) = do putWord16le $ fromIntegral a
-			   putWord32le $ fromIntegral b
+                           putWord32le $ fromIntegral b
 
 
 instance Binary EntryHeader where
   get = do a <- getWord32le
-	   b <- getWord32le
-	   c <- getWord32le
-	   return $ EntryHeader (fromIntegral a) (fromIntegral b) $ fromIntegral c
+           b <- getWord32le
+           c <- getWord32le
+           return $ EntryHeader (fromIntegral a) (fromIntegral b) $ fromIntegral c
 
   put (EntryHeader a b c) = do putWord32le a
-			       putWord32le $ fromIntegral b
-			       putWord32le $ fromIntegral c
+                               putWord32le $ fromIntegral b
+                               putWord32le $ fromIntegral c
 
 instance Binary Mix where
   get = do top <- get
-	   entries <- S.replicateM (fromIntegral $ numFiles top) get
-	   files <- getRemainingLazyByteString
-	   return $ Mix top entries files
+           entries <- S.replicateM (fromIntegral $ numFiles top) get
+           files <- getRemainingLazyByteString
+           return $ Mix top entries files
 
   put (Mix top entries files) = do put top
-				   S.mapM put entries
-				   putLazyByteString files
+                                   S.mapM put entries
+                                   putLazyByteString files
 
 
 --
@@ -152,7 +152,7 @@ instance Binary Mix where
 --
 
 makeMaster x = TopHeader (fromIntegral $ length $ snd x)
-		       $ fst x
+                       $ fst x
 
 makeIndex :: [File3] -> (Int32, [EntryHeader])
 makeIndex = makeIndexReal 0
@@ -175,11 +175,11 @@ filesToMixRaw x = Mix (makeMaster index) (snd index) (L.concat $ map F.contents 
 
 mixToFilesRaw :: Mix -> [File3]
 mixToFilesRaw m = map (\x -> File3 [] (id x)
-			      $ headToBS x $ entryData m)
-		   $ entryHeaders m
+                              $ headToBS x $ entryData m)
+                   $ entryHeaders m
   where
     headToBS entry = L.take   (fromIntegral $ size entry)
-		     . L.drop (fromIntegral $ offset entry)
+                     . L.drop (fromIntegral $ offset entry)
 
 
 --
@@ -193,13 +193,13 @@ saveNames fs
     (File3 [] 0x54c2d545 $ encode $ LocalMixDatabase $ "local mix database.dat" : filter (/=[]) names)
     : fs'
   where fs'    = filter (not . isLMD) fs
-	names  = map F.name fs'
+        names  = map F.name fs'
 
 loadNames :: [File3] -> [File3]
 loadNames fs =
   let lmd     = filter isLMD fs
       dummies = map (update . \x -> File3 x 0 L.empty)
-		$ getLMD $ decode $ F.contents $ head $ lmd
+                $ getLMD $ decode $ F.contents $ head $ lmd
   in case length $ lmd of
     1 -> filter (not . isLMD) $ F.updateMetadataL fs dummies
     _ -> fs
@@ -234,25 +234,25 @@ roundTripTest :: FilePath -> IO ()
 roundTripTest a =
   do a0 <- L.readFile a
      let a1 = encode b0;        b0 = decode a0 :: Mix
-	 b1 = filesToMixRaw c0; c0 = mixToFilesRaw b0
-	 c1 = saveNames d0;     d0 = loadNames c0
+         b1 = filesToMixRaw c0; c0 = mixToFilesRaw b0
+         c1 = saveNames d0;     d0 = loadNames c0
 
-	 a2 = encode b2;        b2 = filesToMixRaw c1
-	 z  = encode (F.filesToArchive $ F.archiveToFiles $ b0 :: Mix)
+         a2 = encode b2;        b2 = filesToMixRaw c1
+         z  = encode (F.filesToArchive $ F.archiveToFiles $ b0 :: Mix)
 
-	 testElseDump b1 b2 s =
-	   if b1 == b2
-	   then print True
-	   else do print False
-		   --L.writeFile (a ++ s1) b1
-		   L.writeFile (a ++ s) b2
+         testElseDump b1 b2 s =
+           if b1 == b2
+           then print True
+           else do print False
+                   --L.writeFile (a ++ s1) b1
+                   L.writeFile (a ++ s) b2
 
-	 testElsePrint b1 b2 f =
-	   if b1 == b2
-	   then print True
-	   else do print False
-		   print $ f b1
-		   print $ f b2
+         testElsePrint b1 b2 f =
+           if b1 == b2
+           then print True
+           else do print False
+                   print $ f b1
+                   print $ f b2
 
      testElseDump a0 a1 "-1"
      testElsePrint b0 b1 showMixHeaders

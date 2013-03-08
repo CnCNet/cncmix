@@ -1,18 +1,18 @@
 module Codec.Archive.CnCMix
        (CnCGame ( TiberianDawn
-		, RedAlert_Normal
+                , RedAlert_Normal
                 , RedAlert_Encrypted
                 , RedAlert_Checksummed
-		--, TiberianSun
-		--, RedAlert2
-		--, Renegade
-		)
+                --, TiberianSun
+                --, RedAlert2
+                --, Renegade
+                )
        , detectGame
        , dispatchDecode
        , dispatchReadL
        , dispatchUpdate
        , dispatchEncode
-	 -- fowarding generic
+       --, fowarding generic
        , File3(contents)
        , F.writeL
        , F.removeL
@@ -50,10 +50,10 @@ data CnCGame = TiberianDawn
              | RedAlert_Normal
              | RedAlert_Encrypted
              | RedAlert_Checksummed
-	     --- | TiberianSun
-	     --- | RedAlert2
-	     --- | Renegade
-	     deriving (Eq, Ord, Show, Read, Bounded, Enum)
+             --- | TiberianSun
+             --- | RedAlert2
+             --- | Renegade
+             deriving (Eq, Ord, Show, Read, Bounded, Enum)
 
 detectGame :: L.ByteString -> CnCGame
 detectGame a = case runGet getWord32le a of
@@ -93,7 +93,7 @@ dispatchRead t = manualDispatch t (TD.read)
 
 dispatchUpdate :: CnCGame-> File3 -> File3
 dispatchUpdate t = manualDispatch t (TD.update)
-		                    (RAN.update)
+                                    (RAN.update)
                                     --(RAE.update)
                                     --(RAC.update)
                                     --(TS.update)
