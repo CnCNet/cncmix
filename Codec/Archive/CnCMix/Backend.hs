@@ -21,11 +21,6 @@ module Codec.Archive.CnCMix.Backend
 import Prelude hiding (read, reads, id)
 import qualified Prelude as P
 
---import Data.Word
---import Data.Int
---import Data.Bits
---import Data.Char
-import Data.List
 import Data.Maybe
 import Data.Either
 
@@ -35,8 +30,6 @@ import System.FilePath
 import qualified Data.ByteString.Lazy as L
 
 import Data.Binary
-import Data.Binary.Get
-import Data.Binary.Put
 
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
@@ -136,6 +129,7 @@ combineFile3LGeneric _ _     [] k  = k
 combineFile3LGeneric f b old new  = case partitionEithers $ map (maybeToEither $ f hO) new of
   (x, y@(_:_)) -> foldl (\a -> fromJust . f a) hO y : combineFile3LGeneric f b tO x
   (_:_, [])    -> hO                                : combineFile3LGeneric f b tO new
+  ([] , [])    -> []
   where hN = head new; tN = tail new
         hO = head old; tO = tail old
 

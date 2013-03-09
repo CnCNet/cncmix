@@ -32,37 +32,29 @@ import qualified Control.Monad as S
 --
 
 -- | A Command & Conquer: Tiberian Dawn MIX archive.
-data Mix = Mix
-    {
-      -- | most importantly, gives filecount
-      masterHeader :: TopHeader,
-      -- | length and offset for each file, IN REVERSE ORDER
-      entryHeaders :: [EntryHeader],
-      -- | the files themselves, concatenated together
-      entryData :: L.ByteString
-    }
+data Mix =
+  Mix
+  { masterHeader :: TopHeader     -- ^ most importantly, gives filecount
+  , entryHeaders :: [EntryHeader] -- ^ length and offset for each file, IN REVERSE ORDER
+  , entryData    :: L.ByteString  -- ^ the files themselves, concatenated together
+  }
   deriving (Show, Eq)
 
 -- | The Master header for a Mix
-data TopHeader = TopHeader
-    {
-      -- | number of internal files
-      numFiles :: Int16,
-      -- | size of the body, not including this header and the index
-      totalSize :: Int32
-    }
+data TopHeader =
+  TopHeader
+  { numFiles  :: Int16 -- ^ number of internal files
+  , totalSize :: Int32 -- ^ size of the body, not including this header and the index
+  }
   deriving (Show, Eq)
 
 -- | A MIX archive entry for a file
-data EntryHeader = EntryHeader
-    {
-      -- | id, used to identify the file instead of a normal name
-      id :: Word32,
-      -- | offset from start of body
-      offset :: Int32,
-      -- | size of this internal file
-      size :: Int32
-    }
+data EntryHeader =
+  EntryHeader
+  { id     :: Word32 -- ^ id, used to identify the file instead of a normal name
+  , offset :: Int32  -- ^ offset from start of body
+  , size   :: Int32  -- ^ size of this internal file
+  }
   deriving (Show, Eq)
 
 
@@ -79,7 +71,7 @@ rotsum accum new = new + (rotateL accum 1)
 
 stringToWord32s :: [Char] -> [Word32]
 stringToWord32s [] = []
-stringToWord32s a
+stringToWord32s a@(_:_)
   | length a<=4 = (stringToWord32 0 0 a) : []
   | length a>4  = (stringToWord32 0 0 $ take 4 a) : (stringToWord32s $ drop 4 a)
 
@@ -143,7 +135,7 @@ instance Binary Mix where
            return $ Mix top entries files
 
   put (Mix top entries files) = do put top
-                                   S.mapM put entries
+                                   S.mapM_ put entries
                                    putLazyByteString files
 
 
@@ -151,6 +143,7 @@ instance Binary Mix where
 -- Create/Extract Mix Headers
 --
 
+makeMaster :: (Int32, [a]) -> TopHeader
 makeMaster x = TopHeader (fromIntegral $ length $ snd x)
                        $ fst x
 
