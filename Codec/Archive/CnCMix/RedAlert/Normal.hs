@@ -41,7 +41,7 @@ instance Binary [File3 ID] where
           fromTD (File3 s (Just i) d) = File3 s (Just (ID i)) d
           fromTD (File3 s Nothing  d) = File3 s Nothing d
 
-  put fs = do putWord32le $ fromIntegral 0
+  put fs = do putWord32le 0
               put $ (map toTD fs :: [File3 TD.ID])
     where toTD :: (File3 ID) -> (File3 TD.ID)
           toTD (File3 s (Just (ID i)) d) = File3 s (Just i) d

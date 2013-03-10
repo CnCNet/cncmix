@@ -3,18 +3,22 @@ module Codec.Archive.CnCMix.Backend
                , name
                , contents
                )
+         -- ID Type Class
        , CnCID
        , stringToID
        , idToNum
        , numToID
        , idToHex
        , hexToID
+         --Generic File3 Functions
        , read
        , readL
        , writeL
+       , remove              --unused
        , removeL
        , mergeL
        , mergeSafeRecursiveL
+       , mergeSymmetricL     --unused
        , detect
        , update
        , updateMetadataL
@@ -24,6 +28,7 @@ module Codec.Archive.CnCMix.Backend
 import Prelude hiding (read, reads, id)
 import qualified Prelude as P
 
+import Data.Word
 import Data.Maybe
 import Data.Either
 
@@ -47,8 +52,8 @@ data File3 id = File3 { name     :: String
 
 class Eq id => CnCID id where
   stringToID :: String -> id
-  idToNum :: (Integral n, Num n) => id -> n
-  numToID :: (Integral n, Num n) => n -> id
+  idToNum :: id -> Word32
+  numToID :: Word32 -> id
 
 --
 -- Porcelain File Operators
@@ -79,8 +84,8 @@ removeL olds news = filter (not . detectL (map name news)
 mergeL :: Eq id => [File3 id] -> [File3 id] -> [File3 id]
 mergeL = combineFile3LGeneric combineNoCollideFile3 True
 
-mergeSymmetricFile3L :: Eq id => [File3 id] -> [File3 id] -> [File3 id]
-mergeSymmetricFile3L = combineFile3LGeneric combineNoDestroyFile3 True
+mergeSymmetricL :: Eq id => [File3 id] -> [File3 id] -> [File3 id]
+mergeSymmetricL = combineFile3LGeneric combineNoDestroyFile3 True
 
 mergeFile3 :: Eq id => [File3 id] -> File3 id -> [File3 id]
 mergeFile3 olds new = mergeL olds [new]
@@ -145,12 +150,14 @@ combineFile3LGeneric :: (File3 id -> File3 id -> Maybe (File3 id))
 combineFile3LGeneric _ True  k  [] = k
 combineFile3LGeneric _ False _  [] = []
 combineFile3LGeneric _ _     [] k  = k
-combineFile3LGeneric f b old new  = case partitionEithers $ map (maybeToEither $ f hO) new of
-  (x, y@(_:_)) -> foldl (\a -> fromJust . f a) hO y : combineFile3LGeneric f b tO x
-  (_:_, [])    -> hO                                : combineFile3LGeneric f b tO new
+combineFile3LGeneric f b (headOld : tailOld) new = 
+  case partitionEithers $ map (maybeToEither $ f headOld) new of
+  (x, y@(_:_)) -> 
+    foldl (\a -> fromJust . f a) headOld y : combineFile3LGeneric f b tailOld x
+  (_:_, [])    ->                headOld   : combineFile3LGeneric f b tailOld new
   ([] , [])    -> []
-  where hN = head new; tN = tail new
-        hO = head old; tO = tail old
+        --hN = head new; tN = tail new
+        
 
 maybeToEither :: (a -> Maybe b) -> a -> Either a b
 maybeToEither f a = case f a of

@@ -93,8 +93,8 @@ asciiCharToWord32 c
 
 instance CnCID ID where
   stringToID = ID . word32sToId . stringToWord32s
-  idToNum (ID i) = fromIntegral i
-  numToID = ID . fromIntegral
+  idToNum (ID i) = i
+  numToID = ID
 
 
 --
