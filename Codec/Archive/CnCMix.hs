@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ExistentialQuantification, FlexibleContexts #-}
+{-# LANGUAGE RankNTypes, ExistentialQuantification, FlexibleContexts, OverlappingInstances #-}
 module Codec.Archive.CnCMix
        (CnCGame ( TiberianDawn
                 , RedAlert_Normal
@@ -9,6 +9,7 @@ module Codec.Archive.CnCMix
                 --, Renegade
                 )
        , CnCMix(CnCMix)
+       , F.CnCID
        , detectGame
          -- fowarding generic
        , File3(File3)

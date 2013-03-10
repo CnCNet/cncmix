@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-module Main(main) where
+module Main() where
 
 import qualified Codec.Archive.CnCMix as F
 import Codec.Archive.CnCMix
@@ -22,6 +22,8 @@ import System.Console.CmdLib
 import Control.Monad
 
 import qualified Data.ByteString.Lazy as L
+
+import Data.Binary
 
 -- so we don't need extensions in cncmix proper
 deriving instance Data     CnCGame
@@ -127,21 +129,21 @@ getDirContentsRecursive p =
   where mapping = mapM $ getDirContentsRecursive . (p </>)
         filtBad = filter $ \x -> x /= "." && x /= ".."
 
-{-
+
 instance RecordCommand Basic where
   run' Info  { lType    = sType -- should we Show the Type?
              , lCont    = sCont
-             , mixPath1 = mPath } _ =
+             , mixPath1 = mixPath } _ =
     do when sType $ putStrLn . ("Mix Type:\t" ++)
-                    =<< liftM (show . F.detectGame) (L.readFile mPath)
+                    =<< liftM (show . F.detectGame) (L.readFile mixPath)
        when sCont $ do putStrLn . ("File Count:\t" ++) . show . length =<< mix
                        putStrLn ""
                        putStrLn $ "Names:  \t" ++ "IDs:"
-                       mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) . F.showHeaders =<< mix
-         where mix :: IO [File3 a]
-               mix = liftM F.dispatchDecode $ L.readFile mPath
+                       (\(CnCMix a) -> mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b)
+                                       $ F.showHeaders a) =<< (mix :: IO CnCMix)
+         where mix = decodeFile mixPath
 
-
+{-
   run' cmd@(Mod { mixType = mType
                 , mixOut  = mOut
                 , mixIn   = mIn
