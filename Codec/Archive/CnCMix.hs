@@ -12,8 +12,8 @@ module Codec.Archive.CnCMix
        , dispatchReadL
        , dispatchUpdate
        , dispatchEncode
-       --, fowarding generic
-       , File3(contents)
+         -- fowarding generic
+       , File3(File3)
        , F.writeL
        , F.removeL
        , F.mergeL
