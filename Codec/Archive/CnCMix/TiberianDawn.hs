@@ -1,15 +1,19 @@
+{-# Language FlexibleInstances, OverlappingInstances #-}
 module Codec.Archive.CnCMix.TiberianDawn
-       ( Mix()
-       , read
-       , readL
-       , update
+       ( ID()
        ) where
 
-import Prelude hiding (read, reads, id)
+import Prelude hiding (id)
 import qualified Prelude as P
 
 import qualified Codec.Archive.CnCMix.Backend as F
-import Codec.Archive.CnCMix.Backend (File3(File3))
+import Codec.Archive.CnCMix.Backend
+  ( File3(File3)
+  , CnCID
+  , stringToID
+  , idToHex
+  , hexToID
+  )
 
 import Codec.Archive.CnCMix.LocalMixDatabase
 
@@ -31,6 +35,9 @@ import qualified Control.Monad as S
 -- Datatypes
 --
 
+newtype ID = ID Word32
+           deriving (Eq, Show)
+
 -- | A Command & Conquer: Tiberian Dawn MIX archive.
 data Mix =
   Mix
@@ -51,15 +58,15 @@ data TopHeader =
 -- | A MIX archive entry for a file
 data EntryHeader =
   EntryHeader
-  { id     :: Word32 -- ^ id, used to identify the file instead of a normal name
-  , offset :: Int32  -- ^ offset from start of body
-  , size   :: Int32  -- ^ size of this internal file
+  { id     :: ID    -- ^ id, used to identify the file instead of a normal name
+  , offset :: Int32 -- ^ offset from start of body
+  , size   :: Int32 -- ^ size of this internal file
   }
   deriving (Show, Eq)
 
 
 --
--- Hashing Function
+-- CnCMix ID Type Class
 --
 
 word32sToId :: [Word32] -> Word32
@@ -88,22 +95,11 @@ asciiCharToWord32 c
   | isAscii c = (fromIntegral $ fromEnum $ toUpper c)
   | otherwise = error "non-ascii"
 
-stringToId :: [Char] -> Word32
-stringToId = (word32sToId . stringToWord32s)
+instance CnCID ID where
+  stringToID = ID . word32sToId . stringToWord32s
+  idToNum (ID i) = fromIntegral $ i
+  numToID = ID . fromIntegral
 
-
---
--- TD's File3 functions
---
-
-read :: FilePath -> IO File3
-read = F.read stringToId
-
-readL :: [FilePath] -> IO [File3]
-readL = F.readL stringToId
-
-update :: File3 -> File3
-update = F.update stringToId
 
 --
 -- decode/encode Mix
@@ -122,11 +118,11 @@ instance Binary EntryHeader where
   get = do a <- getWord32le
            b <- getWord32le
            c <- getWord32le
-           return $ EntryHeader (fromIntegral a) (fromIntegral b) $ fromIntegral c
+           return $ EntryHeader (ID a) (fromIntegral b) $ fromIntegral c
 
-  put (EntryHeader a b c) = do putWord32le a
-                               putWord32le $ fromIntegral b
-                               putWord32le $ fromIntegral c
+  put (EntryHeader (ID a) b c) = do putWord32le a
+                                    putWord32le $ fromIntegral b
+                                    putWord32le $ fromIntegral c
 
 instance Binary Mix where
   get = do top <- get
@@ -147,71 +143,77 @@ makeMaster :: (Int32, [a]) -> TopHeader
 makeMaster x = TopHeader (fromIntegral $ length $ snd x)
                        $ fst x
 
-makeIndex :: [File3] -> (Int32, [EntryHeader])
+makeIndex :: [File3 ID] -> (Int32, [EntryHeader])
 makeIndex = makeIndexReal 0
 
-makeIndexReal :: Int32 -> [File3] -> (Int32, [EntryHeader])
+makeIndexReal :: Int32 -> [File3 ID] -> (Int32, [EntryHeader])
 makeIndexReal a [] = (0, [])
 makeIndexReal a b  =  (len + (fst next), now : (snd next))
   where
     now = case top of
-      (File3 n 0 c) -> EntryHeader (stringToId $ n) a len
-      (File3 _ i c) -> EntryHeader i a len
+      (File3 n Nothing  c) -> EntryHeader (stringToID $ n) a len
+      (File3 _ (Just i) c) -> EntryHeader i a len
     next = makeIndexReal (a+len) (tail b)
     top = head b
     len = fromIntegral $ L.length $ F.contents top
 
 
-filesToMixRaw :: [File3] -> Mix
+filesToMixRaw :: [File3 ID] -> Mix
 filesToMixRaw x = Mix (makeMaster index) (snd index) (L.concat $ map F.contents x)
   where index = (makeIndex x)
 
-mixToFilesRaw :: Mix -> [File3]
-mixToFilesRaw m = map (\x -> File3 [] (id x)
-                              $ headToBS x $ entryData m)
-                   $ entryHeaders m
+mixToFilesRaw :: Mix -> [File3 ID]
+mixToFilesRaw m = map (\(EntryHeader i off len) ->
+                        File3 [] (Just i) $ headToBS off len $ entryData m)
+                  $ entryHeaders m
   where
-    headToBS entry = L.take   (fromIntegral $ size entry)
-                     . L.drop (fromIntegral $ offset entry)
+    headToBS off len = L.take (fromIntegral len)
+                       . L.drop (fromIntegral off)
 
 
 --
 -- Using Local Mix Databases
 --
 
-saveNames :: [File3] -> [File3]
+lmdName :: String
+lmdName = "local mix database.dat"
+
+lmdID :: ID
+lmdID = ID 0x54c2d545 -- $ stringToID "local mix database.dat"
+
+saveNames :: [File3 ID] -> [File3 ID]
 saveNames fs
   | null $ filter (\(File3 n _ _) -> not $ null n) fs = fs
   | otherwise =
-    (File3 [] 0x54c2d545 $ encode $ LocalMixDatabase $ "local mix database.dat" : filter (/=[]) names)
+    (File3 [] (Just lmdID) $ encode $ LocalMixDatabase $ lmdName : filter (/=[]) names)
     : fs'
   where fs'    = filter (not . isLMD) fs
         names  = map F.name fs'
 
-loadNames :: [File3] -> [File3]
+loadNames :: [File3 ID] -> [File3 ID]
 loadNames fs =
   let lmd     = filter isLMD fs
-      dummies = map (update . \x -> File3 x 0 L.empty)
+      dummies = map (F.update . \x -> File3 x Nothing L.empty)
                 $ getLMD $ decode $ F.contents $ head $ lmd
   in case length $ lmd of
     1 -> filter (not . isLMD) $ F.updateMetadataL fs dummies
     _ -> fs
 
-isLMD :: File3 -> Bool
-isLMD = F.detect "local mix database.dat" 0x54c2d545
+isLMD :: File3 ID -> Bool
+isLMD = F.detect lmdName $ Just lmdID
 
 testLMD :: Mix -> Int --[EntryHeader]
-testLMD = length . filter ((0x54c2d545 ==) . id) . entryHeaders
+testLMD = length . filter ((lmdID ==) . id) . entryHeaders
 
 
 --
--- Archive Class Instance
+-- Binary File3 Instance
 --
 
-instance F.Archive Mix where
-  filesToArchive = filesToMixRaw . saveNames
+instance Binary [File3 ID] where
+  put = put . filesToMixRaw . saveNames
 
-  archiveToFiles = loadNames . mixToFilesRaw
+  get = (return . loadNames . mixToFilesRaw) =<< get
 
 
 --
@@ -220,6 +222,7 @@ instance F.Archive Mix where
 
 showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
 showMixHeaders a = (masterHeader a , entryHeaders a)
+
 
 -- Only is accurate if the mix has a local mix database as the FIRST file and entry
 -- (Will read local mix database from any position, but only writes it there)
@@ -231,7 +234,7 @@ roundTripTest a =
          c1 = saveNames d0;     d0 = loadNames c0
 
          a2 = encode b2;        b2 = filesToMixRaw c1
-         z  = encode (F.filesToArchive $ F.archiveToFiles $ b0 :: Mix)
+         z  = encode (decode a0 :: [File3 ID])
 
          testElseDump b1 b2 s =
            if b1 == b2

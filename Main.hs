@@ -11,7 +11,9 @@ import Codec.Archive.CnCMix
             --, RedAlert2
             --, Renegade
             )
-  , File3(File3))
+  , File3(File3)
+  , CnCMix(CnCMix)
+  )
 
 import System.IO
 import System.FilePath
@@ -125,17 +127,20 @@ getDirContentsRecursive p =
   where mapping = mapM $ getDirContentsRecursive . (p </>)
         filtBad = filter $ \x -> x /= "." && x /= ".."
 
-
+{-
 instance RecordCommand Basic where
-  run' Info  { lType    = sType
+  run' Info  { lType    = sType -- should we Show the Type?
              , lCont    = sCont
              , mixPath1 = mPath } _ =
-    do when sType $ putStrLn . ("Mix Type:\t" ++) =<< liftM (show . F.detectGame) (L.readFile mPath)
+    do when sType $ putStrLn . ("Mix Type:\t" ++)
+                    =<< liftM (show . F.detectGame) (L.readFile mPath)
        when sCont $ do putStrLn . ("File Count:\t" ++) . show . length =<< mix
                        putStrLn ""
                        putStrLn $ "Names:  \t" ++ "IDs:"
                        mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) . F.showHeaders =<< mix
-    where mix = liftM F.dispatchDecode $ L.readFile mPath
+         where mix :: IO [File3 a]
+               mix = liftM F.dispatchDecode $ L.readFile mPath
+
 
   run' cmd@(Mod { mixType = mType
                 , mixOut  = mOut
@@ -182,3 +187,4 @@ main :: IO ()
 main = parse =<< getArgs
   where parse :: [String] -> IO ()
         parse x = dispatchR [] x >>= (flip run' x :: Basic -> IO ())
+-}
