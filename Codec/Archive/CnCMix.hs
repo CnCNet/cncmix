@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ExistentialQuantification #-}
+{-# LANGUAGE RankNTypes, ExistentialQuantification, FlexibleContexts #-}
 module Codec.Archive.CnCMix
        (CnCGame ( TiberianDawn
                 , RedAlert_Normal
@@ -10,7 +10,6 @@ module Codec.Archive.CnCMix
                 )
        , CnCMix(CnCMix)
        , detectGame
-       , dispatchDecode
          -- fowarding generic
        , File3(File3)
        , F.writeL
@@ -40,7 +39,7 @@ import System.Console.CmdLib
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
-
+-- | List of games
 data CnCGame = TiberianDawn
              | RedAlert_Normal
              | RedAlert_Encrypted
@@ -50,44 +49,38 @@ data CnCGame = TiberianDawn
              --- | Renegade
              deriving (Eq, Ord, Show, Read, Bounded, Enum)
 
-data CnCMix = forall a. (CnCID a, Eq a) => CnCMix [File3 a]
+-- Binary instance of CnCGame used to detect Mix type
+instance Binary CnCGame where
+  get = do a <- getWord32le
+           return $ case a of
+             0x00000000 -> RedAlert_Normal
+             0x00010000 -> RedAlert_Encrypted
+             0x00020000 -> RedAlert_Checksummed
+             _          -> TiberianDawn
+  put a = error "Don't Do this"
 
-{-
-instance Eq CnCMix where
-  (==) (CnCMix x) (CnCMix y) = x == y
-
-instance CnCID CnCMix where
-  stringToID = CnCMix . F.stringToID
-  numToID    = CnCMix . F.numToID
-  idToNum    (CnCMix x) = F.idToNum    x
--}
-
+-- wrapper around (get :: Get CnCGame)
 detectGame :: L.ByteString -> CnCGame
-detectGame a = case runGet getWord32le a of
-  0x00000000 -> RedAlert_Normal
-  0x00010000 -> RedAlert_Encrypted
-  0x00020000 -> RedAlert_Checksummed
-  _          -> TiberianDawn
+detectGame a = runGet get a
 
-dispatchDecode :: L.ByteString -> CnCMix
-dispatchDecode b =
-  case (detectGame b) of
-    TiberianDawn         -> CnCMix $ (decode b :: [File3 TD.ID])
-    RedAlert_Normal      -> CnCMix $ (decode b :: [File3 RAN.ID])
-    --RedAlert_Encrypted   -> CnCMix $ (decode b :: [File3 RAE.ID])
-    --RedAlert_Checksummed -> CnCMix $ (decode b :: [File3 RAC.ID])
-    --TiberianSun          -> CnCMix $ (decode b :: [File3 TS.ID])
-    --RedAlert2            -> CnCMix $ (decode b :: [File3 RA2.ID])
-    --Renegade             -> CnCMix $ (decode b :: [File3 Rg.ID])
+-- Existential Type for all types of File Lists correspounding to Mix types
+data CnCMix = forall a. (CnCID a, Eq a, Binary [File3 a]) => CnCMix [File3 a]
+
+instance Binary CnCMix where
+  get = do whichMixType <- lookAhead get -- lookAhead so that pointer isn't bumped
+           case whichMixType of
+             TiberianDawn         -> S.liftM CnCMix (get :: Get [File3 TD.ID])
+             RedAlert_Normal      -> S.liftM CnCMix (get :: Get [File3 RAN.ID])
+             --RedAlert_Encrypted   -> S.liftM CnCMix (get :: Get [File3 RAE.ID])
+             --RedAlert_Checksummed -> S.liftM CnCMix (get :: Get [File3 RAC.ID])
+             --TiberianSun          -> S.liftM CnCMix (get :: Get [File3 TS.ID])
+             --RedAlert2            -> S.liftM CnCMix (get :: Get [File3 RA2.ID])
+             --Renegade             -> S.liftM CnCMix (get :: Get [File3 Rg.ID])
+
+  put (CnCMix a) = put a
 
 {-
-liftF :: forall a. CnCID a => File3 a -> File3 CnCMix
-liftF (File3 n Nothing  b) = File3 n Nothing           b
-liftF (File3 n (Just i) b) = File3 n (Just $ CnCMix i) b
-
-liftFs :: forall a. CnCID a => [File3 a] -> [File3 CnCMix]
-liftFs = map liftF
-
+-- I'd like to use Type inference to avoid needing anything like this
 manualConstraint :: CnCGame -> CnCMix -> CnCMix
 manualConstraint t (CnCMix a) =
   case t of
