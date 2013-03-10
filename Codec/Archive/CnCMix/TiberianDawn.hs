@@ -11,8 +11,6 @@ import Codec.Archive.CnCMix.Backend
   ( File3(File3)
   , CnCID
   , stringToID
-  , idToHex
-  , hexToID
   )
 
 import Codec.Archive.CnCMix.LocalMixDatabase
@@ -41,27 +39,24 @@ newtype ID = ID Word32
 -- | A Command & Conquer: Tiberian Dawn MIX archive.
 data Mix =
   Mix
-  { masterHeader :: TopHeader     -- ^ most importantly, gives filecount
-  , entryHeaders :: [EntryHeader] -- ^ length and offset for each file, IN REVERSE ORDER
-  , entryData    :: L.ByteString  -- ^ the files themselves, concatenated together
-  }
+  TopHeader     -- ^ most importantly, gives filecount
+  [EntryHeader] -- ^ length and offset for each file, IN REVERSE ORDER
+  L.ByteString  -- ^ the files themselves, concatenated together
   deriving (Show, Eq)
 
 -- | The Master header for a Mix
 data TopHeader =
   TopHeader
-  { numFiles  :: Int16 -- ^ number of internal files
-  , totalSize :: Int32 -- ^ size of the body, not including this header and the index
-  }
+  Int16 -- ^ number of internal files
+  Int32 -- ^ size of the body, not including this header and the index
   deriving (Show, Eq)
 
 -- | A MIX archive entry for a file
 data EntryHeader =
   EntryHeader
-  { id     :: ID    -- ^ id, used to identify the file instead of a normal name
-  , offset :: Int32 -- ^ offset from start of body
-  , size   :: Int32 -- ^ size of this internal file
-  }
+  ID    -- ^ id, used to identify the file instead of a normal name
+  Int32 -- ^ offset from start of body
+  Int32 -- ^ size of this internal file
   deriving (Show, Eq)
 
 
@@ -74,15 +69,16 @@ word32sToId     [] = 0
 word32sToId (a:as) = foldl rotsum a as
 
 rotsum :: Word32 -> Word32 -> Word32
-rotsum accum new = new + (rotateL accum 1)
+rotsum accum new = new + rotateL accum 1
 
-stringToWord32s :: [Char] -> [Word32]
+stringToWord32s :: String -> [Word32]
 stringToWord32s [] = []
 stringToWord32s a@(_:_)
-  | length a<=4 = (stringToWord32 0 0 a) : []
-  | length a>4  = (stringToWord32 0 0 $ take 4 a) : (stringToWord32s $ drop 4 a)
+  | length a<=4 = [stringToWord32 0 0 a]
+  | length a>4  = stringToWord32 0 0 (take 4 a) : stringToWord32s (drop 4 a)
+  | otherwise   = error "huh? shouldn't get here"
 
-stringToWord32 :: Int -> Word32 -> [Char] -> Word32
+stringToWord32 :: Int -> Word32 -> String -> Word32
 stringToWord32 4     accum _      = accum
 stringToWord32 _     accum []     = accum
 stringToWord32 count accum (x:xs) = stringToWord32
@@ -92,12 +88,12 @@ stringToWord32 count accum (x:xs) = stringToWord32
 
 asciiCharToWord32 :: Char -> Word32
 asciiCharToWord32 c
-  | isAscii c = (fromIntegral $ fromEnum $ toUpper c)
+  | isAscii c = fromIntegral $ fromEnum $ toUpper c
   | otherwise = error "non-ascii"
 
 instance CnCID ID where
   stringToID = ID . word32sToId . stringToWord32s
-  idToNum (ID i) = fromIntegral $ i
+  idToNum (ID i) = fromIntegral i
   numToID = ID . fromIntegral
 
 
@@ -125,8 +121,8 @@ instance Binary EntryHeader where
                                     putWord32le $ fromIntegral c
 
 instance Binary Mix where
-  get = do top <- get
-           entries <- S.replicateM (fromIntegral $ numFiles top) get
+  get = do top@(TopHeader numFiles _) <- get
+           entries <- S.replicateM (fromIntegral numFiles) get
            files <- getRemainingLazyByteString
            return $ Mix top entries files
 
@@ -147,12 +143,12 @@ makeIndex :: [File3 ID] -> (Int32, [EntryHeader])
 makeIndex = makeIndexReal 0
 
 makeIndexReal :: Int32 -> [File3 ID] -> (Int32, [EntryHeader])
-makeIndexReal a [] = (0, [])
+makeIndexReal _ [] = (0, [])
 makeIndexReal a b  =  (len + (fst next), now : (snd next))
   where
     now = case top of
-      (File3 n Nothing  c) -> EntryHeader (stringToID $ n) a len
-      (File3 _ (Just i) c) -> EntryHeader i a len
+      (File3 n Nothing  _) -> EntryHeader (stringToID n) a len
+      (File3 _ (Just i) _) -> EntryHeader i a len
     next = makeIndexReal (a+len) (tail b)
     top = head b
     len = fromIntegral $ L.length $ F.contents top
@@ -160,12 +156,11 @@ makeIndexReal a b  =  (len + (fst next), now : (snd next))
 
 filesToMixRaw :: [File3 ID] -> Mix
 filesToMixRaw x = Mix (makeMaster index) (snd index) (L.concat $ map F.contents x)
-  where index = (makeIndex x)
+  where index = makeIndex x
 
 mixToFilesRaw :: Mix -> [File3 ID]
-mixToFilesRaw m = map (\(EntryHeader i off len) ->
-                        File3 [] (Just i) $ headToBS off len $ entryData m)
-                  $ entryHeaders m
+mixToFilesRaw (Mix _ entryHeaders entryData) =
+  map (\(EntryHeader i off len) -> File3 [] (Just i) $ headToBS off len entryData) entryHeaders
   where
     headToBS off len = L.take (fromIntegral len)
                        . L.drop (fromIntegral off)
@@ -183,7 +178,7 @@ lmdID = ID 0x54c2d545 -- $ stringToID "local mix database.dat"
 
 saveNames :: [File3 ID] -> [File3 ID]
 saveNames fs
-  | null $ filter (\(File3 n _ _) -> not $ null n) fs = fs
+  | all (\(File3 n _ _) -> null n) fs = fs
   | otherwise =
     (File3 [] (Just lmdID) $ encode $ LocalMixDatabase $ lmdName : filter (/=[]) names)
     : fs'
@@ -194,8 +189,8 @@ loadNames :: [File3 ID] -> [File3 ID]
 loadNames fs =
   let lmd     = filter isLMD fs
       dummies = map (F.update . \x -> File3 x Nothing L.empty)
-                $ getLMD $ decode $ F.contents $ head $ lmd
-  in case length $ lmd of
+                $ getLMD $ decode $ F.contents $ head lmd
+  in case length lmd of
     1 -> filter (not . isLMD) $ F.updateMetadataL fs dummies
     _ -> fs
 
@@ -203,7 +198,7 @@ isLMD :: File3 ID -> Bool
 isLMD = F.detect lmdName $ Just lmdID
 
 testLMD :: Mix -> Int --[EntryHeader]
-testLMD = length . filter ((lmdID ==) . id) . entryHeaders
+testLMD (Mix _ ehs _) = length $ filter (\(EntryHeader i _ _) -> lmdID == i) ehs
 
 
 --
@@ -221,7 +216,7 @@ instance Binary [File3 ID] where
 --
 
 showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
-showMixHeaders a = (masterHeader a , entryHeaders a)
+showMixHeaders (Mix th ehs _) = (th , ehs)
 
 
 -- Only is accurate if the mix has a local mix database as the FIRST file and entry
@@ -236,19 +231,19 @@ roundTripTest a =
          a2 = encode b2;        b2 = filesToMixRaw c1
          z  = encode (decode a0 :: [File3 ID])
 
-         testElseDump b1 b2 s =
-           if b1 == b2
+         testElseDump bool1 bool2 s =
+           if bool1 == bool2
            then print True
            else do print False
-                   --L.writeFile (a ++ s1) b1
-                   L.writeFile (a ++ s) b2
+                   --L.writeFile (a ++ s1) bool1
+                   L.writeFile (a ++ s) bool2
 
-         testElsePrint b1 b2 f =
-           if b1 == b2
+         testElsePrint bool1 bool2 f =
+           if bool1 == bool2
            then print True
            else do print False
-                   print $ f b1
-                   print $ f b2
+                   print $ f bool1
+                   print $ f bool2
 
      testElseDump a0 a1 "-1"
      testElsePrint b0 b1 showMixHeaders

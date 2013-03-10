@@ -99,21 +99,21 @@ hexToID :: CnCID id => String -> id
 hexToID = numToID . fst . head . readHex
 
 idToHex :: CnCID id => id -> String
-idToHex = (flip showHex "") . idToNum
+idToHex = (`showHex` "") . idToNum
 
-maybeIDToString :: CnCID id => Maybe id -> [Char]
+maybeIDToString :: CnCID id => Maybe id -> String
 maybeIDToString Nothing  = ""
 maybeIDToString (Just n) = idToHex n
 
 detect :: Eq id => String -> Maybe id -> File3 id -> Bool
 detect n i x = (fName /= [] && n == fName)
-               || (fId /= Nothing && i == fId)
+               || (isJust fId && i == fId)
   where fId   = id x
         fName = name x
 
 detectL :: Eq id => [String] -> [Maybe id] -> File3 id -> Bool
 detectL n i x = (fName /= [] && elem fName n && n /= [])
-                || (fId /= Nothing && elem fId i)
+                || (isJust fId && elem fId i)
   where fId   = id x
         fName = name x
 
@@ -157,7 +157,7 @@ maybeToEither f a = case f a of
   Nothing -> Left  a
   Just b  -> Right b
 
-update :: CnCID id =>  File3 id -> File3 id
+update :: CnCID id => File3 id -> File3 id
 update (File3 [] i c) = File3 [] i c
 update (File3 ('0':'x':s) i c)
   | i == Nothing = File3 [] i' c
@@ -171,5 +171,5 @@ update (File3 s@(_:_) i c)
   where i' = Just $ stringToID s
 
 showHeaders :: CnCID id => [File3 id] -> [(String, String)]
-showHeaders = map $ \(File3 n i _) -> (str $ n, maybeIDToString $ i)
+showHeaders = map $ \(File3 n i _) -> (str n, maybeIDToString i)
   where str b = if b==[] then "<unkown name>" else b

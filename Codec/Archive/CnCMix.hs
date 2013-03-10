@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ExistentialQuantification, FlexibleContexts, OverlappingInstances #-}
+{-# LANGUAGE RankNTypes, ExistentialQuantification, FlexibleContexts #-}
 module Codec.Archive.CnCMix
        (CnCGame ( TiberianDawn
                 , RedAlert_Normal
@@ -12,7 +12,7 @@ module Codec.Archive.CnCMix
        , F.CnCID
        , detectGame
          -- fowarding generic
-       , File3(File3)
+       , File3(F.File3)
        , F.writeL
        , F.removeL
        , F.mergeL
@@ -21,7 +21,7 @@ module Codec.Archive.CnCMix
        ) where
 
 import qualified Codec.Archive.CnCMix.Backend as F
-import Codec.Archive.CnCMix.Backend (File3(File3), CnCID)
+import Codec.Archive.CnCMix.Backend (File3(), CnCID)
 
 import qualified Codec.Archive.CnCMix.TiberianDawn          as TD
 import qualified Codec.Archive.CnCMix.RedAlert.Normal       as RAN
@@ -36,7 +36,6 @@ import qualified Data.ByteString.Lazy as L
 import Data.Binary
 import Data.Binary.Get
 
-import System.Console.CmdLib
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
@@ -58,7 +57,7 @@ instance Binary CnCGame where
              0x00010000 -> RedAlert_Encrypted
              0x00020000 -> RedAlert_Checksummed
              _          -> TiberianDawn
-  put a = error "Don't Do this"
+  put = undefined --error "Don't Do this"
 
 -- wrapper around (get :: Get CnCGame)
 detectGame :: L.ByteString -> CnCGame

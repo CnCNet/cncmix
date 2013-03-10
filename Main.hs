@@ -141,7 +141,7 @@ instance RecordCommand Basic where
                        putStrLn $ "Names:  \t" ++ "IDs:"
                        (\(CnCMix a) -> mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b)
                                        $ F.showHeaders a) =<< (mix :: IO CnCMix)
-         where mix = decodeFile mixPath
+         where mix = (decodeFile mixPath :: IO CnCMix)
 
 {-
   run' cmd@(Mod { mixType = mType

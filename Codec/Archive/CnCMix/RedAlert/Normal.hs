@@ -14,9 +14,6 @@ import Data.Binary.Put
 
 --import Foreign.Storable (sizeOf)
 
-import qualified Control.Monad as S
---import qualified Control.Monad.Parallel as P
-
 
 -- Needed to reimplement typeclasses
 newtype ID = ID TD.ID
