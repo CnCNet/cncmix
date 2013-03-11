@@ -7,10 +7,8 @@ import Codec.Archive.CnCMix
   , File3(File3)
   , AC(AC)
   , CnCMix(CnCMix)
-  , manualConstraint
+  , CnCGame
   )
-
-import qualified Codec.Archive.CnCMix.TiberianDawn as TD (ID())
 
 import System.IO
 import System.FilePath
@@ -28,7 +26,7 @@ import Data.Binary
 deriving instance Data     CnCGame
 deriving instance Typeable CnCGame
 
-data Basic = Info    { mixPath1  :: FilePath
+data Basic = Info    { mixPaths  :: [FilePath]
                      , lType     :: Bool
                      , lCont     :: Bool
                      }
@@ -39,77 +37,79 @@ data Basic = Info    { mixPath1  :: FilePath
                      , mixType   :: CnCGame
                      , safe      :: Bool
                      }
-           | Extract { mixPath2  :: FilePath
+           | Extract { mixPath  :: FilePath
                      , outputDir :: FilePath
                      }
            deriving (Typeable, Data, Eq)
 
 
 instance Attributes Basic where
-  attributes _ = group "Options" [
-    mixPath1  %> [ Short ['I']
-                 , Long ["mix"]
-                 , Help "the path to the Mix to print information about"
-                 , ArgHelp "Path"
-                 , Required True
-                 ],
-    lType     %> [ Short ['t']
-                 , Long  ["print-type"]
-                 , Help "Should CnCMix print the type of Mix?"
-                 , Invertible True
-                 , Default True
-                 ],
-    lCont     %> [ Short ['c']
-                 , Long  ["list-files"]
-                 , Help "Should CnCMix print a list of the Mix's content?"
-                 , Invertible True
-                 , Default True
-                 ],
-    -------------
-    mixOut    %> [ Short ['O']
-                 , Long ["output-mix"]
-                 , Help "the path to write the mix to"
-                 , ArgHelp "Path"
-                 , Required True
-                 ],
-    mixIn     %> [ Short ['I']
-                 , Long ["input-mix"]
-                 , Help "the path to read the mix to"
-                 , ArgHelp "Path"
-                 ],
-    addFs     %> [ Short ['a']
-                 , Long ["add"]
-                 , Help "the files used to create or modify the Mix. Folders will be recurred into"
-                 , ArgHelp "Paths"
-                 ],
-    rmFs      %> [ Short ['d']
-                 , Long ["remove"]
-                 , Help $ "the name or ID of each file to be removed."
-                   ++ " IDs should be prefixed with \'0x\' and written in hexadecimal"
-                 , ArgHelp "Names and IDs"
-                 ],
-    mixType   %> [ Short ['t']
-                 , Long ["type"]
-                 , Help "which type of Mix should be created?"
-                 , ArgHelp "Game-Name"
-                 , Default TiberianDawn
-                 ],
-    safe      %> [ Short ['s']
-                 , Help "should CnCMix check for ID collisions?"
-                 , Invertible True
-                 ],
-    --------------
-    mixPath2  %> [ Short ['I']
-                 , Long ["mix"]
-                 , Help "the path to the Mix to be extracted"
-                 , ArgHelp "Path"
-                 , Required True
-                 ],
-    outputDir %> [ Short ['O']
-                 , Help "the directory to extract the files into"
-                 , ArgHelp "Path"
-                 , Required True
-                 ]
+  attributes _ = foldl1 (%%)
+    [ mixPaths  %> [ {-Short ['i']
+                   , Long ["mix"]
+                   , Help "the path to the Mix to print information about"
+                   ,-} ArgHelp "Paths to Mixes"
+                   , Required True
+                   , Extra True
+                   ]
+    , lType     %> [ Short ['t']
+                   , Long  ["print-type"]
+                   , Help "Should CnCMix print the type of Mix?"
+                   , Invertible True
+                   , Default True
+                   ]
+    , lCont     %> [ Short ['c']
+                   , Long  ["list-files"]
+                   , Help "Should CnCMix print a list of the Mix's content?"
+                   , Invertible True
+                   , Default True
+                   ]
+      --------------------------
+    , mixOut    %> [ Short ['o']
+                   , Long ["output-mix"]
+                   , Help "the path to write the mix to"
+                   , ArgHelp "Path"
+                   , Required True
+                   ]
+    , mixIn     %> [ Short ['i']
+                   , Long ["input-mix"]
+                   , Help "the path to read the mix to"
+                   , ArgHelp "Path"
+                   ]
+    , addFs     %> [ Short ['a']
+                   , Long ["add"]
+                   , Help $ "the files used to create or modify the Mix. " ++
+                     "Folders will be recurred into"
+                   , ArgHelp "Paths"
+                   ]
+    , rmFs      %> [ Short ['d']
+                   , Long ["remove"]
+                   , Help $ "the name or ID of each file to be removed."
+                     ++ " IDs should be prefixed with \'0x\' and written in hexadecimal"
+                   , ArgHelp "Names and IDs"
+                   ]
+    , mixType   %> [ Short ['t']
+                   , Long ["type"]
+                   , Help "which type of Mix should be created?"
+                   , ArgHelp "Game-Name"
+                   , Required True
+                   ]
+    , safe      %> [ Short ['s']
+                   , Help "should CnCMix check for ID collisions?"
+                   , Invertible True
+                   ]
+      --------------------------
+    , mixPath   %> [ Short ['i']
+                   , Long ["mix"]
+                   , Help "the path to the Mix to be extracted"
+                   , ArgHelp "Path"
+                   , Required True
+                   ]
+    , outputDir %> [ Short ['o']
+                   , Help "the directory to extract the files into"
+                   , ArgHelp "Path"
+                   , Required True
+                   ]
     ]
 
 
@@ -117,28 +117,69 @@ instance Attributes Basic where
 --                  ++ "\n" ++ "A simple tool to manipulate Mix archives of the older"
 --                  ++ "Command & Conquer Games, designed especially for automated use."
 --                  ++ "\n" ++ "source at http://github.com/Sonarpulse/CnC-Red-Alert"
---                  ++ "\n" ++ "run again with '\"'--help'\"' to see avaible options"]
+--                  ++ "\n" ++ "run again with \"--help\" to see avaible options"]
 
-getDirContentsRecursive :: FilePath -> IO [FilePath]
-getDirContentsRecursive p =
-  doesDirectoryExist p >>= \x ->
-  if x
-  then liftM concat . mapping . filtBad =<< getDirectoryContents p
-  else return [p]
-  where mapping = mapM $ getDirContentsRecursive . (p </>)
-        filtBad = filter $ \x -> x /= "." && x /= ".."
+main :: IO ()
+main = parse =<< getArgs
+  where parse :: [String] -> IO ()
+        parse x = dispatchR [] x >>= (flip run' x :: Basic -> IO ())
 
 
 instance RecordCommand Basic where
+  mode_summary Info    {} = "Print information about a Mix"   ++ "\n"
+  mode_summary Mod     {} = "Create or modify a Mix archive"  ++ "\n"
+  mode_summary Extract {} = "Extract files from a Mix"        ++ "\n"
+
+  mode_help Info    {} =
+    "\n" ++
+    "The two options below control what information is printed about each mix. " ++ "\n" ++
+    "Other arguments will treated as paths to mixes. Information about every "   ++ "\n" ++
+    "mix will be printed in the order the paths are given."                      ----------
+  mode_help Mod     {} =
+    "\n" ++
+    "The is the Swiss army knife. No matter what, the only thing the tool will " ++ "\n" ++
+    "create or change is a mix at the given output path."                      ++ "\n\n" ++
+
+    "The files in that mix will come from an optionally specified input mix or " ++ "\n" ++
+    "list of paths: files in the list will simply be added, directories will"    ++ "\n" ++
+    "be substituted for their contents as a MIX is a flat filesystem."         ++ "\n\n" ++
+
+    "Before any files are added, however, their names and IDs will be matched "  ++ "\n" ++
+    "against the list of IDs and files to be excluded. Naturally, files that "   ++ "\n" ++
+    "match will not be added"                                                  ++ "\n\n" ++
+
+    "CnCMix is smart and will adjust if an input mix is given at the same path " ++ "\n" ++
+    "as the output mix. Instead of reading the input mix and writing to the "    ++ "\n" ++
+    "output mix (which really are the same), it will write to a temporary file " ++ "\n" ++
+    "and then rename the temporary file to overwrite the original file in "      ++ "\n" ++
+    "order to still work with constant memory. Use this feature to modify an"    ++ "\n" ++
+    "existing mix. It will likewise adjust for symlinks or hardlinks, so be "    ++ "\n" ++
+    "careful."                                                                 ++ "\n\n" ++
+
+    "Lastly since it is required that a mix type be given, in case a wholly "    ++ "\n" ++
+    "new mix is being made, but if an input mix is given, it's type will be "    ++ "\n" ++
+    "used instead"                                                               ----------
+  mode_help Extract {} =
+    "\n" ++
+    "All files from will be placed in the directory specified. "                 ++ "\n" ++
+    "Pretty self-explanatory I would think."                                     ----------
+
+
+
+
+--
+-- Logic of the CLI
+--
+
   run' Info  { lType    = sType -- should we Show the Type?
              , lCont    = sCont
-             , mixPath1 = mixPath } _ =
-    do mixFile <- L.readFile mixPath
-       when sType $ putStrLn . ("Mix Type:\t" ++) $ (show . F.detectGame) mixFile
+             , mixPaths = mPaths } _ =
+    forM_ mPaths $ L.readFile >=> \mixFile ->
+    do putStrLn ""
+       when sType $ putStrLn $ ("Mix Type:\t" ++) $ show $ F.detectGame $ mixFile
        when sCont $ do (CnCMix (AC mix)) <- return $ decode mixFile
                        putStrLn $ ("File Count:\t" ++) $ show $ length mix
-                       putStrLn ""
-                       putStrLn $ "Names:  \t" ++ "IDs:"
+                       putStrLn $ "Names   " ++ "\t" ++ "IDs"
                        mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) $ F.showHeaders mix
 
   run' Mod { mixType = mType
@@ -170,7 +211,7 @@ instance RecordCommand Basic where
                          aFs'
                     else F.mergeL old aFs')
                    $ map (F.update . \a -> File3 a Nothing L.empty) rFs
-         else do (CnCMix (AC dummy)) <- return $ manualConstraint mType
+         else do (CnCMix (AC dummy)) <- return $ F.manualConstraint mType
                  aFs' <- F.readMany =<< liftM concat (mapM getDirContentsRecursive aFs)
                  return $ encode $ AC $ if isS
                                         then F.mergeSafeRecursiveL dummy aFs'
@@ -179,16 +220,15 @@ instance RecordCommand Basic where
        when colP $ renameFile (fst tmpF) mOut
 
   run' Extract { outputDir = oDir
-               , mixPath2  = mPath} _ = do (CnCMix (AC mix)) <- decodeFile mPath
+               , mixPath   = mPath} _ = do (CnCMix (AC mix)) <- decodeFile mPath
                                            F.writeMany oDir mix
 
 
-  mode_summary Info    {} = "print information about a Mix"
-  mode_summary Mod     {} = "create or modify a Mix archive"
-  mode_summary Extract {} = "extract files from a Mix"
-
-
-main :: IO ()
-main = parse =<< getArgs
-  where parse :: [String] -> IO ()
-        parse x = dispatchR [] x >>= (flip run' x :: Basic -> IO ())
+getDirContentsRecursive :: FilePath -> IO [FilePath]
+getDirContentsRecursive p =
+  doesDirectoryExist p >>= \x ->
+  if x
+  then liftM concat . mapping . filtBad =<< getDirectoryContents p
+  else return [p]
+  where mapping = mapM $ getDirContentsRecursive . (p </>)
+        filtBad = filter $ \x -> x /= "." && x /= ".."
