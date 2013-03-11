@@ -3,14 +3,7 @@ module Main(main) where
 
 import qualified Codec.Archive.CnCMix as F
 import Codec.Archive.CnCMix
-  ( CnCGame ( TiberianDawn
-            , RedAlert_Normal
-            , RedAlert_Encrypted
-            , RedAlert_Checksummed
-            --, TiberianSun
-            --, RedAlert2
-            --, Renegade
-            )
+  ( CnCGame (TiberianDawn) -- default
   , File3(File3)
   , AC(AC)
   , CnCMix(CnCMix)
@@ -148,12 +141,13 @@ instance RecordCommand Basic where
                        putStrLn $ "Names:  \t" ++ "IDs:"
                        mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) $ F.showHeaders mix
 
-  run' cmd@(Mod { mixType = mType
+  run' Mod { mixType = mType
                 , mixOut  = mOut
                 , mixIn   = mIn
+                , addFs   = aFs
                 , rmFs    = rFs
                 , safe    = isS
-                }) _ =
+                } _ =
     do temP <- doesFileExist mIn -- if mIn exists
            -- if mIn is specified and valid
        let inP  = mIn /= "" && (temP || error "input Mix does not exist")
@@ -168,19 +162,19 @@ instance RecordCommand Basic where
        L.hPut (snd tmpF) =<<
          if inP
          then do (CnCMix (AC old)) <- decodeFile mIn
-                 aFs <- F.readMany =<< (liftM concat . mapM getDirContentsRecursive $ addFs cmd)
+                 aFs' <- F.readMany =<< liftM concat (mapM getDirContentsRecursive aFs)
                  return $ encode $ AC $ F.removeL
                    (if isS
                     then F.mergeSafeRecursiveL
                          (F.mergeSafeRecursiveL [] old)
-                         aFs
-                    else F.mergeL old aFs)
+                         aFs'
+                    else F.mergeL old aFs')
                    $ map (F.update . \a -> File3 a Nothing L.empty) rFs
          else do (CnCMix (AC dummy)) <- return $ manualConstraint mType
-                 aFs <- F.readMany =<< (liftM concat . mapM getDirContentsRecursive $ addFs cmd)
+                 aFs' <- F.readMany =<< liftM concat (mapM getDirContentsRecursive aFs)
                  return $ encode $ AC $ if isS
-                                        then F.mergeSafeRecursiveL dummy aFs
-                                        else aFs
+                                        then F.mergeSafeRecursiveL dummy aFs'
+                                        else aFs'
        hClose $ snd tmpF
        when colP $ renameFile (fst tmpF) mOut
 
