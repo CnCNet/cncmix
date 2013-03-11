@@ -3,11 +3,10 @@ module Main(main) where
 
 import qualified Codec.Archive.CnCMix as F
 import Codec.Archive.CnCMix
-  ( CnCGame (TiberianDawn) -- default
-  , File3(File3)
+  ( File3(File3)
   , AC(AC)
   , CnCMix(CnCMix)
-  , CnCGame
+  --, CnCGame
   )
 
 import System.IO
@@ -23,8 +22,8 @@ import qualified Data.ByteString.Lazy as L
 import Data.Binary
 
 -- so we don't need extensions in cncmix proper
-deriving instance Data     CnCGame
-deriving instance Typeable CnCGame
+--deriving instance Data     CnCGame
+--deriving instance Typeable CnCGame
 
 data Basic = Info    { mixPaths  :: [FilePath]
                      , lType     :: Bool
@@ -34,7 +33,7 @@ data Basic = Info    { mixPaths  :: [FilePath]
                      , mixOut    :: FilePath
                      , addFs     :: [FilePath]
                      , rmFs      :: [String]
-                     , mixType   :: CnCGame
+                     , mixType   :: Int --CnCGame
                      , safe      :: Bool
                      }
            | Extract { mixPath  :: FilePath
@@ -183,12 +182,12 @@ instance RecordCommand Basic where
                        mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) $ F.showHeaders mix
 
   run' Mod { mixType = mType
-                , mixOut  = mOut
-                , mixIn   = mIn
-                , addFs   = aFs
-                , rmFs    = rFs
-                , safe    = isS
-                } _ =
+           , mixOut  = mOut
+           , mixIn   = mIn
+           , addFs   = aFs
+           , rmFs    = rFs
+           , safe    = isS
+           } _ =
     do temP <- doesFileExist mIn -- if mIn exists
            -- if mIn is specified and valid
        let inP  = mIn /= "" && (temP || error "input Mix does not exist")
@@ -211,7 +210,7 @@ instance RecordCommand Basic where
                          aFs'
                     else F.mergeL old aFs')
                    $ map (F.update . \a -> File3 a Nothing L.empty) rFs
-         else do (CnCMix (AC dummy)) <- return $ F.manualConstraint mType
+         else do (CnCMix (AC dummy)) <- return $ F.manualConstraint $ toEnum mType
                  aFs' <- F.readMany =<< liftM concat (mapM getDirContentsRecursive aFs)
                  return $ encode $ AC $ if isS
                                         then F.mergeSafeRecursiveL dummy aFs'
