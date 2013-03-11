@@ -13,7 +13,7 @@ module Codec.Archive.CnCMix
        , detectGame
          -- fowarding generic
        , File3(F.File3)
-       , F.writeL
+       , F.writeMany
        , F.removeL
        , F.mergeL
        , F.mergeSafeRecursiveL
@@ -21,7 +21,7 @@ module Codec.Archive.CnCMix
        ) where
 
 import qualified Codec.Archive.CnCMix.Backend as F
-import Codec.Archive.CnCMix.Backend (File3(), CnCID)
+import Codec.Archive.CnCMix.Backend (File3(), AC(AC), CnCID)
 
 import qualified Codec.Archive.CnCMix.TiberianDawn          as TD
 import qualified Codec.Archive.CnCMix.RedAlert.Normal       as RAN
@@ -64,18 +64,18 @@ detectGame :: L.ByteString -> CnCGame
 detectGame a = runGet get a
 
 -- Existential Type for all types of File Lists correspounding to Mix types
-data CnCMix = forall a. (CnCID a, Eq a, Binary [File3 a]) => CnCMix [File3 a]
+data CnCMix = forall a. (CnCID a, Eq a, Binary (AC (File3 a))) => CnCMix (AC (File3 a))
 
 instance Binary CnCMix where
   get = do whichMixType <- lookAhead get -- lookAhead so that pointer isn't bumped
            case whichMixType of
-             TiberianDawn         -> S.liftM CnCMix (get :: Get [File3 TD.ID])
-             RedAlert_Normal      -> S.liftM CnCMix (get :: Get [File3 RAN.ID])
-             --RedAlert_Encrypted   -> S.liftM CnCMix (get :: Get [File3 RAE.ID])
-             --RedAlert_Checksummed -> S.liftM CnCMix (get :: Get [File3 RAC.ID])
-             --TiberianSun          -> S.liftM CnCMix (get :: Get [File3 TS.ID])
-             --RedAlert2            -> S.liftM CnCMix (get :: Get [File3 RA2.ID])
-             --Renegade             -> S.liftM CnCMix (get :: Get [File3 Rg.ID])
+             TiberianDawn         -> S.liftM CnCMix (get :: Get (AC (File3 TD.ID)))
+             RedAlert_Normal      -> S.liftM CnCMix (get :: Get (AC (File3 RAN.ID)))
+             --RedAlert_Encrypted   -> S.liftM CnCMix (get :: Get (AC (File3 RAE.ID)))
+             --RedAlert_Checksummed -> S.liftM CnCMix (get :: Get (AC (File3 RAC.ID)))
+             --TiberianSun          -> S.liftM CnCMix (get :: Get (AC (File3 TS.ID)))
+             --RedAlert2            -> S.liftM CnCMix (get :: Get (AC (File3 RA2.ID)))
+             --Renegade             -> S.liftM CnCMix (get :: Get (AC (File3 Rg.ID)))
 
   put (CnCMix a) = put a
 

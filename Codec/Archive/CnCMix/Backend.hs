@@ -3,6 +3,7 @@ module Codec.Archive.CnCMix.Backend
                , name
                , contents
                )
+       , AC(AC)
          -- ID Type Class
        , CnCID
        , stringToID
@@ -12,8 +13,9 @@ module Codec.Archive.CnCMix.Backend
        , hexToID
          --Generic File3 Functions
        , read
-       , readL
-       , writeL
+       , readMany
+       , write
+       , writeMany
        , remove              --unused
        , removeL
        , mergeL
@@ -28,6 +30,9 @@ module Codec.Archive.CnCMix.Backend
 import Prelude hiding (read, reads, id)
 import qualified Prelude as P
 
+--import Data.Set (Set())
+--import qualified Data.Set as Set
+
 import Data.Word
 import Data.Maybe
 import Data.Either
@@ -37,14 +42,14 @@ import Numeric
 import System.FilePath
 import qualified Data.ByteString.Lazy as L
 
+
+import Data.Foldable(Foldable)
+import qualified Data.Foldable as Y
+import Data.Traversable(Traversable)
+import qualified Data.Traversable as Y
+
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
-
-data File3 id = File3 { name     :: String
-                      , id       :: Maybe id
-                      , contents :: L.ByteString }
-              deriving (Show, Read, Eq)
-
 
 --
 -- CnCID Type Class
@@ -55,6 +60,16 @@ class Eq id => CnCID id where
   idToNum :: id -> Word32
   numToID :: Word32 -> id
 
+
+--
+-- File3 Definition
+--
+
+data File3 id = File3 { name     :: String
+                      , id       :: Maybe id
+                      , contents :: L.ByteString }
+              deriving (Show, Read, Eq)
+
 --
 -- Porcelain File Operators
 --
@@ -63,17 +78,21 @@ read :: CnCID id => FilePath -> IO (File3 id)
 read p = return . update . File3 shortname Nothing =<< L.readFile p
   where shortname = takeFileName p
 
-readL :: CnCID id => [FilePath] -> IO [File3 id]
-readL = S.mapM read
+readMany :: (CnCID id, Traversable t, Foldable t) =>
+            t FilePath -> IO (t (File3 id))
+readMany = Y.mapM read
+            -- If no deforestation, something like
+            -- Y.foldlM (return . Set.insert S.<=< read) Set.empty a
 
 write :: CnCID id => FilePath -> File3 id -> IO ()
 write p (File3 []      i c) = L.writeFile (p </> "0x" ++ maybeIDToString i) c
 write p (File3 n@(_:_) _ c) = L.writeFile (p </> n) c
 
-writeL :: CnCID id => (Integral id, Eq id) => FilePath -> [File3 id] -> IO ()
-writeL = S.mapM_ . write
+writeMany :: (CnCID id, Traversable t, Foldable t) =>
+             (Integral id, Eq id) => FilePath -> t (File3 id) -> IO ()
+writeMany = Y.mapM_ . write
 
-remove :: Eq id => [File3 id] -> File3 id -> [File3 id]
+remove ::  Eq id => [File3 id] -> File3 id -> [File3 id]
 remove olds (File3 nn ni _) = filter (not . detect nn ni) olds
 
 removeL :: Eq id => [File3 id] -> [File3 id] -> [File3 id]
@@ -150,14 +169,14 @@ combineFile3LGeneric :: (File3 id -> File3 id -> Maybe (File3 id))
 combineFile3LGeneric _ True  k  [] = k
 combineFile3LGeneric _ False _  [] = []
 combineFile3LGeneric _ _     [] k  = k
-combineFile3LGeneric f b (headOld : tailOld) new = 
+combineFile3LGeneric f b (headOld : tailOld) new =
   case partitionEithers $ map (maybeToEither $ f headOld) new of
-  (x, y@(_:_)) -> 
+  (x, y@(_:_)) ->
     foldl (\a -> fromJust . f a) headOld y : combineFile3LGeneric f b tailOld x
   (_:_, [])    ->                headOld   : combineFile3LGeneric f b tailOld new
   ([] , [])    -> []
         --hN = head new; tN = tail new
-        
+
 
 maybeToEither :: (a -> Maybe b) -> a -> Either a b
 maybeToEither f a = case f a of
@@ -180,3 +199,13 @@ update (File3 s@(_:_) i c)
 showHeaders :: CnCID id => [File3 id] -> [(String, String)]
 showHeaders = map $ \(File3 n i _) -> (str n, maybeIDToString i)
   where str b = if b==[] then "<unkown name>" else b
+
+--
+-- AvoidConflict
+--
+
+newtype AC a = AC [a]
+             deriving (Show, Eq)
+
+instance Functor AC where
+  fmap f (AC a) = AC $ fmap f a
