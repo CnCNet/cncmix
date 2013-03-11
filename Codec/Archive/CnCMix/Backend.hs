@@ -51,6 +51,7 @@ import qualified Data.Traversable as Y
 import qualified Control.Monad as S ()
 --import qualified Control.Monad.Parallel as P ()
 
+
 --
 -- CnCID Type Class
 --
@@ -59,7 +60,6 @@ class Eq id => CnCID id where
   stringToID :: String -> id
   idToNum :: id -> Word32
   numToID :: Word32 -> id
-
 
 --
 -- File3 Definition
@@ -205,7 +205,7 @@ showHeaders = map $ \(File3 n i _) -> (str n, maybeIDToString i)
 --
 
 newtype AC a = AC [a]
-             deriving (Show, Eq)
+             deriving (Eq, Show)
 
 instance Functor AC where
   fmap f (AC a) = AC $ fmap f a

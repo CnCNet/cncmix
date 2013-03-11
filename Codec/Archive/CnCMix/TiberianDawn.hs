@@ -43,14 +43,14 @@ data Mix =
   TopHeader     -- ^ most importantly, gives filecount
   [EntryHeader] -- ^ length and offset for each file, IN REVERSE ORDER
   L.ByteString  -- ^ the files themselves, concatenated together
-  deriving (Show, Eq)
+  deriving (Eq, Show)
 
 -- | The Master header for a Mix
 data TopHeader =
   TopHeader
   Int16         -- ^ number of internal files
   Int32         -- ^ size of the body, not including this header and the index
-  deriving (Show, Eq)
+  deriving (Eq, Show)
 
 -- | A MIX archive entry for a file
 data EntryHeader =
@@ -58,7 +58,7 @@ data EntryHeader =
   ID            -- ^ id, used to identify the file instead of a normal name
   Int32         -- ^ offset from start of body
   Int32         -- ^ size of this internal file
-  deriving (Show, Eq)
+  deriving (Eq, Show)
 
 
 --
