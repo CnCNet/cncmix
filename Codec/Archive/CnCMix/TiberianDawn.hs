@@ -47,16 +47,16 @@ data Mix =
 -- | The Master header for a Mix
 data TopHeader =
   TopHeader
-  Int16 -- ^ number of internal files
-  Int32 -- ^ size of the body, not including this header and the index
+  Int16         -- ^ number of internal files
+  Int32         -- ^ size of the body, not including this header and the index
   deriving (Show, Eq)
 
 -- | A MIX archive entry for a file
 data EntryHeader =
   EntryHeader
-  ID    -- ^ id, used to identify the file instead of a normal name
-  Int32 -- ^ offset from start of body
-  Int32 -- ^ size of this internal file
+  ID            -- ^ id, used to identify the file instead of a normal name
+  Int32         -- ^ offset from start of body
+  Int32         -- ^ size of this internal file
   deriving (Show, Eq)
 
 
