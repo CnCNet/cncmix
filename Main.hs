@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
-module Main() where
+module Main(main) where
 
 import qualified Codec.Archive.CnCMix as F
 import Codec.Archive.CnCMix
@@ -12,14 +12,20 @@ import Codec.Archive.CnCMix
             --, Renegade
             )
   , File3(File3)
+  , AC(AC)
   , CnCMix(CnCMix)
+  , manualConstraint
   )
+
+import qualified Codec.Archive.CnCMix.TiberianDawn as TD (ID())
 
 import System.IO
 import System.FilePath
 import System.Directory
 import System.Console.CmdLib
+
 import Control.Monad
+--import Control.Monad.Parallel
 
 import qualified Data.ByteString.Lazy as L
 
@@ -134,16 +140,14 @@ instance RecordCommand Basic where
   run' Info  { lType    = sType -- should we Show the Type?
              , lCont    = sCont
              , mixPath1 = mixPath } _ =
-    do when sType $ putStrLn . ("Mix Type:\t" ++)
-                    =<< liftM (show . F.detectGame) (L.readFile mixPath)
-       when sCont $ do putStrLn . ("File Count:\t" ++) . show . length =<< mix
+    do mixFile <- L.readFile mixPath
+       when sType $ putStrLn . ("Mix Type:\t" ++) $ (show . F.detectGame) mixFile
+       when sCont $ do (CnCMix (AC mix)) <- return $ decode mixFile
+                       putStrLn $ ("File Count:\t" ++) $ show $ length mix
                        putStrLn ""
                        putStrLn $ "Names:  \t" ++ "IDs:"
-                       (\(CnCMix a) -> mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b)
-                                       $ F.showHeaders a) =<< (mix :: IO CnCMix)
-         where mix = (decodeFile mixPath :: IO CnCMix)
+                       mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) $ F.showHeaders mix
 
-{-
   run' cmd@(Mod { mixType = mType
                 , mixOut  = mOut
                 , mixIn   = mIn
@@ -152,32 +156,37 @@ instance RecordCommand Basic where
                 }) _ =
     do temP <- doesFileExist mIn -- if mIn exists
            -- if mIn is specified and valid
-       let inP  = mIn /= [] && (temP || error "input Mix does not exist")
+       let inP  = mIn /= "" && (temP || error "input Mix does not exist")
            -- if mIn and mOut are the same (and mIn is valid)
            colP = inP && mIn == mOut
-       aFs  <- F.dispatchReadL mType =<< (liftM concat . mapM getDirContentsRecursive $ addFs cmd)
+
        tmpF <- if colP
                then uncurry openBinaryTempFile $ splitFileName mOut
                else liftM ((,) []) $ openBinaryFile mOut WriteMode
-       nMix <- if inP
-               then do old <- F.dispatchDecode `liftM` L.readFile mIn
-                       let mid = if isS
-                                 then F.mergeSafeRecursiveL
-                                      (F.mergeSafeRecursiveL [] old)
-                                      aFs
-                                 else F.mergeL old aFs
-                       return $ F.removeL mid
-                         $ map (F.dispatchUpdate mType . \a -> File3 a 0 L.empty) rFs
-               else return  $ if isS
-                              then F.mergeSafeRecursiveL [] aFs
-                              else aFs
-       L.hPut (snd tmpF) $ F.dispatchEncode mType nMix
+
+       -- repetition nessisary for type checking
+       L.hPut (snd tmpF) =<<
+         if inP
+         then do (CnCMix (AC old)) <- decodeFile mIn
+                 aFs <- F.readMany =<< (liftM concat . mapM getDirContentsRecursive $ addFs cmd)
+                 return $ encode $ AC $ F.removeL
+                   (if isS
+                    then F.mergeSafeRecursiveL
+                         (F.mergeSafeRecursiveL [] old)
+                         aFs
+                    else F.mergeL old aFs)
+                   $ map (F.update . \a -> File3 a Nothing L.empty) rFs
+         else do (CnCMix (AC dummy)) <- return $ manualConstraint mType
+                 aFs <- F.readMany =<< (liftM concat . mapM getDirContentsRecursive $ addFs cmd)
+                 return $ encode $ AC $ if isS
+                                        then F.mergeSafeRecursiveL dummy aFs
+                                        else aFs
        hClose $ snd tmpF
        when colP $ renameFile (fst tmpF) mOut
 
   run' Extract { outputDir = oDir
-               , mixPath2  = mPath} _ =
-    F.writeL oDir =<< liftM F.dispatchDecode (L.readFile mPath)
+               , mixPath2  = mPath} _ = do (CnCMix (AC mix)) <- decodeFile mPath
+                                           F.writeMany oDir mix
 
 
   mode_summary Info    {} = "print information about a Mix"
@@ -189,4 +198,3 @@ main :: IO ()
 main = parse =<< getArgs
   where parse :: [String] -> IO ()
         parse x = dispatchR [] x >>= (flip run' x :: Basic -> IO ())
--}

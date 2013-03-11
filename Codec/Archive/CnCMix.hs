@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ExistentialQuantification, FlexibleContexts #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleContexts #-}
 module Codec.Archive.CnCMix
        (CnCGame ( TiberianDawn
                 , RedAlert_Normal
@@ -11,12 +11,16 @@ module Codec.Archive.CnCMix
        , CnCMix(CnCMix)
        , F.CnCID
        , detectGame
+       , manualConstraint
          -- fowarding generic
        , File3(F.File3)
+       , AC(AC)
+       , F.readMany
        , F.writeMany
        , F.removeL
        , F.mergeL
        , F.mergeSafeRecursiveL
+       , F.update
        , F.showHeaders
        ) where
 
@@ -73,22 +77,21 @@ instance Binary CnCMix where
              RedAlert_Normal      -> S.liftM CnCMix (get :: Get (AC (File3 RAN.ID)))
              --RedAlert_Encrypted   -> S.liftM CnCMix (get :: Get (AC (File3 RAE.ID)))
              --RedAlert_Checksummed -> S.liftM CnCMix (get :: Get (AC (File3 RAC.ID)))
-             --TiberianSun          -> S.liftM CnCMix (get :: Get (AC (File3 TS.ID)))
+             --TiberianSun          -> S.liftM CnCMix (get :: Get (AC (File3  TS.ID)))
              --RedAlert2            -> S.liftM CnCMix (get :: Get (AC (File3 RA2.ID)))
-             --Renegade             -> S.liftM CnCMix (get :: Get (AC (File3 Rg.ID)))
+             --Renegade             -> S.liftM CnCMix (get :: Get (AC (File3  Rg.ID)))
 
   put (CnCMix a) = put a
 
-{-
+
 -- I'd like to use Type inference to avoid needing anything like this
-manualConstraint :: CnCGame -> CnCMix -> CnCMix
-manualConstraint t (CnCMix a) =
+manualConstraint :: CnCGame -> CnCMix
+manualConstraint t =
   case t of
-    TiberianDawn         -> CnCMix (a :: File3 TD.ID)
-    RedAlert_Normal      -> CnCMix (a :: File3 RAN.ID)
-    --RedAlert_Encrypted   -> f3
-    --RedAlert_Checksummed -> f4
-    --TiberianSun          -> f5
-    --RedAlert2            -> f6
-    --Renegade             -> f7
--}
+    TiberianDawn         -> CnCMix $ AC ([] :: [File3  TD.ID])
+    RedAlert_Normal      -> CnCMix $ AC ([] :: [File3 RAN.ID])
+    --RedAlert_Encrypted   -> CnCMix $ AC ([] :: [File3 RAE.ID])
+    --RedAlert_Checksummed -> CnCMix $ AC ([] :: [File3 RAC.ID])
+    --TiberianSun          -> CnCMix $ AC ([] :: [File3  TS.ID])
+    --RedAlert2            -> CnCMix $ AC ([] :: [File3 RA2.ID])
+    --Renegade             -> CnCMix $ AC ([] :: [File3  Rg.ID])

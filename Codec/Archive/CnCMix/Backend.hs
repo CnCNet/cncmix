@@ -48,8 +48,8 @@ import qualified Data.Foldable as Y
 import Data.Traversable(Traversable)
 import qualified Data.Traversable as Y
 
-import qualified Control.Monad as S
---import qualified Control.Monad.Parallel as P
+import qualified Control.Monad as S ()
+--import qualified Control.Monad.Parallel as P ()
 
 --
 -- CnCID Type Class
@@ -89,7 +89,7 @@ write p (File3 []      i c) = L.writeFile (p </> "0x" ++ maybeIDToString i) c
 write p (File3 n@(_:_) _ c) = L.writeFile (p </> n) c
 
 writeMany :: (CnCID id, Traversable t, Foldable t) =>
-             (Integral id, Eq id) => FilePath -> t (File3 id) -> IO ()
+             FilePath -> t (File3 id) -> IO ()
 writeMany = Y.mapM_ . write
 
 remove ::  Eq id => [File3 id] -> File3 id -> [File3 id]
