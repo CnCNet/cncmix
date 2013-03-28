@@ -131,37 +131,37 @@ instance RecordCommand Basic where
 
   mode_help Info    {} =
     "\n" ++
-    "The two options below control what information is printed about each mix. " ++ "\n" ++
-    "Other arguments will treated as paths to mixes. Information about every "   ++ "\n" ++
-    "mix will be printed in the order the paths are given."                      ----------
+    "The two options below control what information is printed about each mix." ++ "\n" ++
+    "Other arguments will treated as paths to mixes. Information about every"   ++ "\n" ++
+    "mix will be printed in the order the paths are given."                     ----------
   mode_help Mod     {} =
     "\n" ++
-    "The is the Swiss army knife. No matter what, the only thing the tool will " ++ "\n" ++
-    "create or change is a mix at the given output path."                      ++ "\n\n" ++
+    "The is the Swiss army knife. No matter what, the only thing the tool will" ++ "\n" ++
+    "create or change is a mix at the given output path."                     ++ "\n\n" ++
 
-    "The files in that mix will come from an optionally specified input mix or " ++ "\n" ++
-    "list of paths: files in the list will simply be added, directories will"    ++ "\n" ++
-    "be substituted for their contents as a MIX is a flat filesystem."         ++ "\n\n" ++
+    "The files in that mix will come from an optionally specified input mix or" ++ "\n" ++
+    "list of paths: files in the list will simply be added, directories will"   ++ "\n" ++
+    "be substituted for their contents as a MIX is a flat filesystem."        ++ "\n\n" ++
 
-    "Before any files are added, however, their names and IDs will be matched "  ++ "\n" ++
-    "against the list of IDs and files to be excluded. Naturally, files that "   ++ "\n" ++
-    "match will not be added"                                                  ++ "\n\n" ++
+    "Before any files are added, however, their names and IDs will be matched"  ++ "\n" ++
+    "against the list of IDs and files to be excluded. Naturally, files that"   ++ "\n" ++
+    "match will not be added."                                                ++ "\n\n" ++
 
-    "CnCMix is smart and will adjust if an input mix is given at the same path " ++ "\n" ++
-    "as the output mix. Instead of reading the input mix and writing to the "    ++ "\n" ++
-    "output mix (which really are the same), it will write to a temporary file " ++ "\n" ++
-    "and then rename the temporary file to overwrite the original file in "      ++ "\n" ++
-    "order to still work with constant memory. Use this feature to modify an"    ++ "\n" ++
-    "existing mix. It will likewise adjust for symlinks or hardlinks, so be "    ++ "\n" ++
-    "careful."                                                                 ++ "\n\n" ++
+    "CnCMix is smart and will adjust if an input mix is given at the same path" ++ "\n" ++
+    "as the output mix. Instead of reading the input mix and writing to the"    ++ "\n" ++
+    "output mix (which really are the same), it will write to a temporary file" ++ "\n" ++
+    "and then rename the temporary file to overwrite the original file in"      ++ "\n" ++
+    "order to still work with constant memory. Use this feature to modify an"   ++ "\n" ++
+    "existing mix. It will likewise adjust for symlinks or hardlinks, so be"    ++ "\n" ++
+    "careful."                                                                ++ "\n\n" ++
 
-    "Lastly since it is required that a mix type be given, in case a wholly "    ++ "\n" ++
-    "new mix is being made, but if an input mix is given, it's type will be "    ++ "\n" ++
-    "used instead"                                                               ----------
+    "Lastly, it is required that a mix type be given, in case a wholly new mix" ++ "\n" ++
+    "is being made. However, if an input mix is given, it's type will be used"  ++ "\n" ++
+    "instead."                                                                  ----------
   mode_help Extract {} =
     "\n" ++
-    "All files from will be placed in the directory specified. "                 ++ "\n" ++
-    "Pretty self-explanatory I would think."                                     ----------
+    "All files from will be placed in the directory specified. "                ++ "\n" ++
+    "Pretty self-explanatory I would think."                                    ----------
 
 
 
