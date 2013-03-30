@@ -1,4 +1,4 @@
-{-# Language FlexibleInstances #-}
+{-# Language FlexibleInstances, OverlappingInstances #-}
 module Codec.Archive.CnCMix.TiberianDawn
        ( ID()
        ) where
@@ -9,7 +9,6 @@ import qualified Prelude as P
 import qualified Codec.Archive.CnCMix.Backend as F
 import Codec.Archive.CnCMix.Backend
   ( File3(File3)
-  , AC(AC)
   , CnCID
   , stringToID
   )
@@ -206,10 +205,10 @@ testLMD (Mix _ ehs _) = length $ filter (\(EntryHeader i _ _) -> lmdID == i) ehs
 -- Binary File3 Instance
 --
 
-instance Binary (AC (File3 ID)) where
-  put (AC a) = put $ filesToMixRaw $ saveNames a
+instance Binary [File3 ID] where
+  put a = put $ filesToMixRaw $ saveNames a
 
-  get = (return . AC . loadNames . mixToFilesRaw) =<< get
+  get = (return .  loadNames . mixToFilesRaw) =<< get
 
 
 --
@@ -230,7 +229,7 @@ roundTripTest a =
          c1 = saveNames d0;     d0 = loadNames c0
 
          a2 = encode b2;        b2 = filesToMixRaw c1
-         z  = encode (decode a0 :: AC (File3 ID))
+         z  = encode (decode a0 :: [File3 ID])
 
          testElseDump bool1 bool2 s =
            if bool1 == bool2

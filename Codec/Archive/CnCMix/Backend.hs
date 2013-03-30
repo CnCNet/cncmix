@@ -3,7 +3,6 @@ module Codec.Archive.CnCMix.Backend
                , name
                , contents
                )
-       , AC(AC)
          -- ID Type Class
        , CnCID
        , stringToID
@@ -199,13 +198,3 @@ update (File3 s@(_:_) i c)
 showHeaders :: CnCID id => [File3 id] -> [(String, String)]
 showHeaders = map $ \(File3 n i _) -> (str n, maybeIDToString i)
   where str b = if b==[] then "<unkown name>" else b
-
---
--- AvoidConflict
---
-
-newtype AC a = AC [a]
-             deriving (Eq, Show)
-
-instance Functor AC where
-  fmap f (AC a) = AC $ fmap f a

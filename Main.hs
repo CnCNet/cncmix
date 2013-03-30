@@ -4,7 +4,6 @@ module Main(main) where
 import qualified Codec.Archive.CnCMix as F
 import Codec.Archive.CnCMix
   ( File3(File3)
-  , AC(AC)
   , CnCMix(CnCMix)
   --, CnCGame
   )
@@ -176,7 +175,7 @@ instance RecordCommand Basic where
     forM_ mPaths $ L.readFile >=> \mixFile ->
     do putStrLn ""
        when sType $ putStrLn $ ("Mix Type:\t" ++) $ show $ F.detectGame $ mixFile
-       when sCont $ do (CnCMix (AC mix)) <- return $ decode mixFile
+       when sCont $ do CnCMix mix <- return $ decode mixFile
                        putStrLn $ ("File Count:\t" ++) $ show $ length mix
                        putStrLn $ "Names   " ++ "\t" ++ "IDs"
                        mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) $ F.showHeaders mix
@@ -201,25 +200,25 @@ instance RecordCommand Basic where
        -- repetition nessisary for type checking
        L.hPut (snd tmpF) =<<
          if inP
-         then do (CnCMix (AC old)) <- decodeFile mIn
+         then do CnCMix old <- decodeFile mIn
                  aFs' <- F.readMany =<< liftM concat (mapM getDirContentsRecursive aFs)
-                 return $ encode $ AC $ F.removeL
+                 return $ encode $ F.removeL
                    (if isS
                     then F.mergeSafeRecursiveL
                          (F.mergeSafeRecursiveL [] old)
                          aFs'
                     else F.mergeL old aFs')
                    $ map (F.update . \a -> File3 a Nothing L.empty) rFs
-         else do (CnCMix (AC dummy)) <- return $ F.manualConstraint $ toEnum mType
+         else do CnCMix dummy <- return $ F.manualConstraint $ toEnum mType
                  aFs' <- F.readMany =<< liftM concat (mapM getDirContentsRecursive aFs)
-                 return $ encode $ AC $ if isS
-                                        then F.mergeSafeRecursiveL dummy aFs'
-                                        else aFs'
+                 return $ encode $ if isS
+                                   then F.mergeSafeRecursiveL dummy aFs'
+                                   else aFs'
        hClose $ snd tmpF
        when colP $ renameFile (fst tmpF) mOut
 
   run' Extract { outputDir = oDir
-               , mixPath   = mPath} _ = do (CnCMix (AC mix)) <- decodeFile mPath
+               , mixPath   = mPath} _ = do CnCMix mix <- decodeFile mPath
                                            F.writeMany oDir mix
 
 
