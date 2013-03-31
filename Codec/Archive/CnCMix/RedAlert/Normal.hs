@@ -1,4 +1,4 @@
-{-# Language FlexibleInstances, OverlappingInstances #-}
+{-# Language FlexibleInstances, OverlappingInstances, GeneralizedNewtypeDeriving #-}
 module Codec.Archive.CnCMix.RedAlert.Normal
        ( ID()
        ) where
@@ -17,18 +17,7 @@ import Data.Binary.Put
 
 -- Needed to reimplement typeclasses
 newtype ID = ID TD.ID
-           deriving (Eq, Show)
-
-
---
--- CnCMix ID Type Class
---
-
-instance CnCID ID where
-  stringToID = ID . (F.stringToID :: String -> TD.ID)
-  idToNum (ID a) = F.idToNum (a :: TD.ID)
-  numToID a  = ID (F.numToID  a :: TD.ID)
-
+           deriving (Eq, Show, CnCID)
 
 --
 -- decode/encode Mix
