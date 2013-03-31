@@ -105,23 +105,23 @@ instance CnCID ID where
 --
 
 instance Binary TopHeader where
-  get = do a <- getWord16le
-           b <- getWord32le
-           return $ TopHeader (fromIntegral a) $ fromIntegral b
+  get = do fileCount <- getWord16le
+           sumFileSize <- getWord32le
+           return $ TopHeader (fromIntegral fileCount) $ fromIntegral sumFileSize
 
-  put (TopHeader a b) = do putWord16le $ fromIntegral a
-                           putWord32le $ fromIntegral b
+  put (TopHeader fileCount sumFileSize) = do putWord16le $ fromIntegral fileCount
+                                             putWord32le $ fromIntegral sumFileSize
 
 
 instance Binary EntryHeader where
-  get = do a <- getWord32le
-           b <- getWord32le
-           c <- getWord32le
-           return $ EntryHeader (ID a) (fromIntegral b) $ fromIntegral c
+  get = do hash <- getWord32le
+           offset <- getWord32le
+           size <- getWord32le
+           return $ EntryHeader (ID hash) (fromIntegral offset) $ fromIntegral size
 
-  put (EntryHeader (ID a) b c) = do putWord32le a
-                                    putWord32le $ fromIntegral b
-                                    putWord32le $ fromIntegral c
+  put (EntryHeader (ID hash) offset size) = do putWord32le hash
+                                               putWord32le $ fromIntegral offset
+                                               putWord32le $ fromIntegral size
 
 instance Binary Mix where
   get = do top@(TopHeader numFiles _) <- get
