@@ -35,7 +35,7 @@ data Basic = Info    { mixPaths  :: [FilePath]
                      , mixType   :: Int --CnCGame
                      , safe      :: Bool
                      }
-           | Extract { mixPath  :: FilePath
+           | Extract { mixPath   :: FilePath
                      , outputDir :: FilePath
                      }
            deriving (Typeable, Data, Eq)

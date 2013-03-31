@@ -92,7 +92,7 @@ asciiCharToWord32 c
   | otherwise = error "non-ascii"
 
 instance CnCID ID where
-  stringToID = ID . word32sToId . stringToWord32s
+  stringToIDRaw = ID . word32sToId . stringToWord32s
   idToNum (ID i) = i
   numToID = ID
 

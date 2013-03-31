@@ -6,6 +6,7 @@ module Codec.Archive.CnCMix.Backend
          -- ID Type Class
        , CnCID
        , stringToID
+       , stringToIDRaw
        , idToNum
        , numToID
        , idToHex
@@ -56,9 +57,20 @@ import qualified Control.Monad as S ()
 --
 
 class Eq id => CnCID id where
-  stringToID :: String -> id
+  stringToIDRaw :: String -> id
   idToNum :: id -> Word32
   numToID :: Word32 -> id
+
+  hexToID :: CnCID id => String -> id
+  hexToID = numToID . fst . head . readHex
+
+  idToHex :: CnCID id => id -> String
+  idToHex = (`showHex` "") . idToNum
+
+  stringToID :: String -> id
+  stringToID ('0':'x':s) = hexToID s
+  stringToID s = stringToIDRaw s
+  
 
 --
 -- File3 Definition
@@ -117,12 +129,6 @@ mergeSafeRecursiveL = foldl mergeFile3
 --
 -- Plumbing File Operators
 --
-
-hexToID :: CnCID id => String -> id
-hexToID = numToID . fst . head . readHex
-
-idToHex :: CnCID id => id -> String
-idToHex = (`showHex` "") . idToNum
 
 maybeIDToString :: CnCID id => Maybe id -> String
 maybeIDToString Nothing  = ""
@@ -184,11 +190,6 @@ maybeToEither f a = case f a of
 
 update :: CnCID id => File3 id -> File3 id
 update (File3 [] i c) = File3 [] i c
-update (File3 ('0':'x':s) i c)
-  | i == Nothing = File3 [] i' c
-  | i == i'      = File3 [] i' c
-  | otherwise    = error "id does not match filename"
-  where i' = Just $ hexToID s
 update (File3 s@(_:_) i c)
   | i == Nothing  = File3 s i' c
   | i == i'       = File3 s i' c
