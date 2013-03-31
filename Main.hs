@@ -180,6 +180,11 @@ instance RecordCommand Basic where
                        putStrLn $ "Names   " ++ "\t" ++ "IDs"
                        mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) $ F.showHeaders mix
 
+  run' Extract { outputDir = oDir
+               , mixPath   = mPath} _ = do CnCMix mix <- decodeFile mPath
+                                           F.writeMany oDir mix
+
+
   run' Mod { mixType = mType
            , mixOut  = mOut
            , mixIn   = mIn
@@ -216,11 +221,6 @@ instance RecordCommand Basic where
                                    else aFs'
        hClose $ snd tmpF
        when colP $ renameFile (fst tmpF) mOut
-
-  run' Extract { outputDir = oDir
-               , mixPath   = mPath} _ = do CnCMix mix <- decodeFile mPath
-                                           F.writeMany oDir mix
-
 
 getDirContentsRecursive :: FilePath -> IO [FilePath]
 getDirContentsRecursive p =
