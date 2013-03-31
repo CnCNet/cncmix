@@ -1,12 +1,16 @@
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving, ScopedTypeVariables #-}
 module Main(main) where
 
 import qualified Codec.Archive.CnCMix as F
 import Codec.Archive.CnCMix
-  ( File3(File3)
+  ( File(File)
   , CnCMix(CnCMix)
+  , CnCID()
   --, CnCGame
   )
+
+import Data.Map (Map())
+import qualified Data.Map as Map
 
 import System.IO
 import System.FilePath
@@ -92,10 +96,6 @@ instance Attributes Basic where
                    , ArgHelp "Game-Name"
                    , Required True
                    ]
-    , safe      %> [ Short ['s']
-                   , Help "should CnCMix check for ID collisions?"
-                   , Invertible True
-                   ]
       --------------------------
     , mixPath   %> [ Short ['i']
                    , Long ["mix"]
@@ -163,8 +163,6 @@ instance RecordCommand Basic where
     "Pretty self-explanatory I would think."                                    ----------
 
 
-
-
 --
 -- Logic of the CLI
 --
@@ -176,7 +174,7 @@ instance RecordCommand Basic where
     do putStrLn ""
        when sType $ putStrLn $ ("Mix Type:\t" ++) $ show $ F.detectGame $ mixFile
        when sCont $ do CnCMix mix <- return $ decode mixFile
-                       putStrLn $ ("File Count:\t" ++) $ show $ length mix
+                       putStrLn $ ("File Count:\t" ++) $ show $ Map.size mix
                        putStrLn $ "Names   " ++ "\t" ++ "IDs"
                        mapM_ (putStrLn . \(a,b) -> a ++ "\t" ++ b) $ F.showHeaders mix
 
@@ -184,49 +182,43 @@ instance RecordCommand Basic where
                , mixPath   = mPath} _ = do CnCMix mix <- decodeFile mPath
                                            F.writeMany oDir mix
 
-
   run' Mod { mixType = mType
            , mixOut  = mOut
            , mixIn   = mIn
            , addFs   = aFs
            , rmFs    = rFs
-           , safe    = isS
            } _ =
     do temP <- doesFileExist mIn -- if mIn exists
            -- if mIn is specified and valid
-       let inP  = mIn /= "" && (temP || error "input Mix does not exist")
+       let validImputMixExists  = mIn /= "" && (temP || error "input Mix does not exist")
            -- if mIn and mOut are the same (and mIn is valid)
-           colP = inP && mIn == mOut
+           willMutateMix = validImputMixExists && mIn == mOut
 
-       tmpF <- if colP
+       tmpF <- if willMutateMix
                then uncurry openBinaryTempFile $ splitFileName mOut
                else liftM ((,) []) $ openBinaryFile mOut WriteMode
 
        -- repetition nessisary for type checking
        L.hPut (snd tmpF) =<<
-         if inP
+         if validImputMixExists
          then do CnCMix old <- decodeFile mIn
-                 aFs' <- F.readMany =<< liftM concat (mapM getDirContentsRecursive aFs)
-                 return $ encode $ F.removeL
-                   (if isS
-                    then F.mergeSafeRecursiveL
-                         (F.mergeSafeRecursiveL [] old)
-                         aFs'
-                    else F.mergeL old aFs')
-                   $ map (F.update . \a -> File3 a Nothing L.empty) rFs
+                 addMap <- F.readMany =<< getDirContentsRecursive aFs
+                 let remover :: CnCID id => FilePath -> Map id File -> Map id File
+                     remover f m = Map.delete (F.stringToID f) m
+                 return $ encode $ foldr remover (Map.union addMap old) rFs
          else do CnCMix dummy <- return $ F.manualConstraint $ toEnum mType
-                 aFs' <- F.readMany =<< liftM concat (mapM getDirContentsRecursive aFs)
-                 return $ encode $ if isS
-                                   then F.mergeSafeRecursiveL dummy aFs'
-                                   else aFs'
-       hClose $ snd tmpF
-       when colP $ renameFile (fst tmpF) mOut
+                 return . encode . Map.union dummy =<< F.readMany =<< getDirContentsRecursive aFs
 
-getDirContentsRecursive :: FilePath -> IO [FilePath]
-getDirContentsRecursive p =
-  doesDirectoryExist p >>= \x ->
-  if x
-  then liftM concat . mapping . filtBad =<< getDirectoryContents p
-  else return [p]
-  where mapping = mapM $ getDirContentsRecursive . (p </>)
-        filtBad = filter $ \x -> x /= "." && x /= ".."
+       -- close and (maybe) rename
+       hClose $ snd tmpF
+       when willMutateMix $ renameFile (fst tmpF) mOut
+
+
+getDirContentsRecursive :: CnCID id => [FilePath] -> IO (Map id FilePath)
+getDirContentsRecursive = foldr helper $ return Map.empty
+  where helper :: CnCID id => FilePath -> IO (Map id FilePath) -> IO (Map id FilePath)
+        helper path map =
+          doesDirectoryExist path >>= \x ->
+            if x
+            then liftM2 Map.union (getDirContentsRecursive =<< getDirectoryContents path) map
+            else liftM (Map.insert (F.stringToID path) path) map

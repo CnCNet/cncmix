@@ -13,18 +13,15 @@ module Codec.Archive.CnCMix
        , detectGame
        , manualConstraint
          -- fowarding generic
-       , File3(F.File3)
+       , F.stringToID
+       , File(F.File)
        , F.readMany
        , F.writeMany
-       , F.removeL
-       , F.mergeL
-       , F.mergeSafeRecursiveL
-       , F.update
        , F.showHeaders
        ) where
 
 import qualified Codec.Archive.CnCMix.Backend as F
-import Codec.Archive.CnCMix.Backend (File3(), CnCID)
+import Codec.Archive.CnCMix.Backend (File(), CnCID)
 
 import qualified Codec.Archive.CnCMix.TiberianDawn          as TD
 import qualified Codec.Archive.CnCMix.RedAlert.Normal       as RAN
@@ -35,6 +32,9 @@ import qualified Codec.Archive.CnCMix.RedAlert.Normal       as RAN
 --import qualified Codec.Archive.CnCMix.Renegade              as Rg
 
 import qualified Data.ByteString.Lazy as L
+
+import Data.Map (Map())
+import qualified Data.Map as Map
 
 import Data.Binary
 import Data.Binary.Get
@@ -67,18 +67,18 @@ detectGame :: L.ByteString -> CnCGame
 detectGame a = runGet get a
 
 -- Existential Type for all types of File Lists correspounding to Mix types
-data CnCMix = forall a. (CnCID a, Eq a, Binary [File3 a]) => CnCMix [File3 a]
+data CnCMix = forall id. (CnCID id, Eq id, Ord id, Binary (Map id File)) => CnCMix (Map id File)
 
 instance Binary CnCMix where
   get = do whichMixType <- lookAhead get -- lookAhead so that pointer isn't bumped
            case whichMixType of
-             TiberianDawn         -> S.liftM CnCMix (get :: Get [File3  TD.ID])
-             RedAlert_Normal      -> S.liftM CnCMix (get :: Get [File3 RAN.ID])
-             --RedAlert_Encrypted   -> S.liftM CnCMix (get :: Get [File3 RAE.ID])
-             --RedAlert_Checksummed -> S.liftM CnCMix (get :: Get [File3 RAC.ID])
-             --TiberianSun          -> S.liftM CnCMix (get :: Get [File3  TS.ID])
-             --RedAlert2            -> S.liftM CnCMix (get :: Get [File3 RA2.ID])
-             --Renegade             -> S.liftM CnCMix (get :: Get [File3  Rg.ID])
+             TiberianDawn         -> S.liftM CnCMix (get :: Get (Map  TD.ID File))
+             RedAlert_Normal      -> S.liftM CnCMix (get :: Get (Map RAN.ID File))
+             --RedAlert_Encrypted   -> S.liftM CnCMix (get :: Get (Map RAE.ID File))
+             --RedAlert_Checksummed -> S.liftM CnCMix (get :: Get (Map RAC.ID File))
+             --TiberianSun          -> S.liftM CnCMix (get :: Get (Map  TS.ID File))
+             --RedAlert2            -> S.liftM CnCMix (get :: Get (Map RA2.ID File))
+             --Renegade             -> S.liftM CnCMix (get :: Get (Map  Rg.ID File))
 
   put (CnCMix a) = put a
 
@@ -87,10 +87,10 @@ instance Binary CnCMix where
 manualConstraint :: CnCGame -> CnCMix
 manualConstraint t =
   case t of
-    TiberianDawn         -> CnCMix ([] :: [File3  TD.ID])
-    RedAlert_Normal      -> CnCMix ([] :: [File3 RAN.ID])
-    --RedAlert_Encrypted   -> CnCMix ([] :: [File3 RAE.ID])
-    --RedAlert_Checksummed -> CnCMix ([] :: [File3 RAC.ID])
-    --TiberianSun          -> CnCMix ([] :: [File3  TS.ID])
-    --RedAlert2            -> CnCMix ([] :: [File3 RA2.ID])
-    --Renegade             -> CnCMix ([] :: [File3  Rg.ID])
+    TiberianDawn         -> CnCMix (Map.empty :: (Map  TD.ID File))
+    RedAlert_Normal      -> CnCMix (Map.empty :: (Map RAN.ID File))
+    --RedAlert_Encrypted   -> CnCMix (Map.empty :: (Map RAE.ID File))
+    --RedAlert_Checksummed -> CnCMix (Map.empty :: (Map RAC.ID File))
+    --TiberianSun          -> CnCMix (Map.empty :: (Map  TS.ID File))
+    --RedAlert2            -> CnCMix (Map.empty :: (Map RA2.ID File))
+    --Renegade             -> CnCMix (Map.empty :: (Map  Rg.ID File))

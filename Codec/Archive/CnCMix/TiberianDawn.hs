@@ -8,12 +8,15 @@ import qualified Prelude as P
 
 import qualified Codec.Archive.CnCMix.Backend as F
 import Codec.Archive.CnCMix.Backend
-  ( File3(File3)
+  ( File(File)
   , CnCID
   , stringToID
   )
 
 import Codec.Archive.CnCMix.LocalMixDatabase
+
+import Data.Map (Map())
+import qualified Data.Map as Map
 
 import Data.Int
 import Data.Bits
@@ -34,7 +37,7 @@ import qualified Control.Monad as S
 --
 
 newtype ID = ID Word32
-           deriving (Eq, Show)
+           deriving (Eq, Ord, Show)
 
 -- | A Command & Conquer: Tiberian Dawn MIX archive.
 data Mix =
@@ -135,35 +138,26 @@ instance Binary Mix where
 -- Create/Extract Mix Headers
 --
 
-makeMaster :: (Int32, [a]) -> TopHeader
-makeMaster x = TopHeader (fromIntegral $ length $ snd x)
-                       $ fst x
-
-makeIndex :: [File3 ID] -> (Int32, [EntryHeader])
-makeIndex = makeIndexReal 0
-
-makeIndexReal :: Int32 -> [File3 ID] -> (Int32, [EntryHeader])
-makeIndexReal _ [] = (0, [])
-makeIndexReal a b  =  (len + (fst next), now : (snd next))
-  where
-    now = case top of
-      (File3 n Nothing  _) -> EntryHeader (stringToID n) a len
-      (File3 _ (Just i) _) -> EntryHeader i a len
-    next = makeIndexReal (a+len) (tail b)
-    top = head b
-    len = fromIntegral $ L.length $ F.contents top
+makeIndex :: Map ID File -> (Int32, [EntryHeader], L.ByteString)
+makeIndex = Map.foldrWithKey foldfunc (0, [], L.empty)
+  where foldfunc i (File n c) (count, es, cs) =
+          (count+len, (EntryHeader (id i n) count len):es, cs `L.append` c)
+          where len = fromIntegral $ L.length c
+                id i []      = i
+                id _ n@(_:_) = stringToID n
 
 
-filesToMixRaw :: [File3 ID] -> Mix
-filesToMixRaw x = Mix (makeMaster index) (snd index) (L.concat $ map F.contents x)
-  where index = makeIndex x
+filesToMixRaw :: Map ID File -> Mix
+filesToMixRaw mp = Mix top ehs files
+  where (size, ehs, files) = makeIndex mp
+        count = length ehs
+        top = TopHeader (fromIntegral count) size
 
-mixToFilesRaw :: Mix -> [File3 ID]
+mixToFilesRaw :: Mix -> Map ID File
 mixToFilesRaw (Mix _ entryHeaders entryData) =
-  map (\(EntryHeader i off len) -> File3 [] (Just i) $ headToBS off len entryData) entryHeaders
+  Map.fromList $ map (\(EntryHeader i off len) -> (i, File [] $ headToBS off len)) entryHeaders
   where
-    headToBS off len = L.take (fromIntegral len)
-                       . L.drop (fromIntegral off)
+    headToBS off len = L.take (fromIntegral len) $ L.drop (fromIntegral off) entryData
 
 
 --
@@ -176,37 +170,36 @@ lmdName = "local mix database.dat"
 lmdID :: ID
 lmdID = ID 0x54c2d545 -- $ stringToID "local mix database.dat"
 
-saveNames :: [File3 ID] -> [File3 ID]
-saveNames fs
-  | all (\(File3 n _ _) -> null n) fs = fs
-  | otherwise =
-    (File3 [] (Just lmdID) $ encode $ LocalMixDatabase $ lmdName : filter (/=[]) names)
-    : fs'
-  where fs'    = filter (not . isLMD) fs
-        names  = map F.name fs'
+saveNames :: Map ID File -> Map ID File
+saveNames fs = if Map.size names /= 0
+               then Map.insert lmdID lmd fs
+               else fs
+  where names = Map.mapMaybe mapper fs
+        mapper (File []          _) = Nothing
+        mapper (File ('0':'x':_) _) = Nothing
+        mapper (File n           _) = Just n
+        lmd = File [] $ encode $ LocalMixDatabase names
 
-loadNames :: [File3 ID] -> [File3 ID]
+loadNames :: Map ID File -> Map ID File
 loadNames fs =
-  let lmd     = filter isLMD fs
-      dummies = map (F.update . \x -> File3 x Nothing L.empty)
-                $ getLMD $ decode $ F.contents $ head lmd
-  in case length lmd of
-    1 -> filter (not . isLMD) $ F.updateMetadataL fs dummies
-    _ -> fs
+  case q of
+    Nothing -> fs
+    -- differenceWith ensures that orphan filnames from the LMD are not added
+    (Just (File n c)) -> Map.differenceWith update proper names
+      where update :: File -> String -> Maybe File
+            update (File _  c) n = Just $ File n c -- found match
+            -- we want to remove file TODO: add contents check to make sure we actually have an LMD
+            names = getLMD $ decode c
 
-isLMD :: File3 ID -> Bool
-isLMD = F.detect lmdName $ Just lmdID
-
-testLMD :: Mix -> Int --[EntryHeader]
-testLMD (Mix _ ehs _) = length $ filter (\(EntryHeader i _ _) -> lmdID == i) ehs
+  where (q, proper) = Map.updateLookupWithKey (\_ _ -> Nothing) lmdID fs
 
 
 --
 -- Binary File3 Instance
 --
 
-instance Binary [File3 ID] where
-  put a = put $ filesToMixRaw $ saveNames a
+instance Binary (Map ID File) where
+  put = put . filesToMixRaw . saveNames
 
   get = (return .  loadNames . mixToFilesRaw) =<< get
 
@@ -216,7 +209,7 @@ instance Binary [File3 ID] where
 --
 
 showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
-showMixHeaders (Mix th ehs _) = (th , ehs)
+showMixHeaders (Mix th ehs _) = (th, ehs)
 
 
 -- Only is accurate if the mix has a local mix database as the FIRST file and entry
@@ -229,7 +222,7 @@ roundTripTest a =
          c1 = saveNames d0;     d0 = loadNames c0
 
          a2 = encode b2;        b2 = filesToMixRaw c1
-         z  = encode (decode a0 :: [File3 ID])
+         z  = encode (decode a0 :: Map ID File)
 
          testElseDump bool1 bool2 s =
            if bool1 == bool2
@@ -247,7 +240,7 @@ roundTripTest a =
 
      testElseDump a0 a1 "-1"
      testElsePrint b0 b1 showMixHeaders
-     testElsePrint c0 (map (\(File3 _ i c) -> File3 [] i c) c1) F.showHeaders
+     testElsePrint c0 (Map.map (\(File _ c) -> File [] c) c1) F.showHeaders
      --names stripped so test works, (loading and saving names keeps names in files3)
 
      testElseDump a0 a2 "-2"
