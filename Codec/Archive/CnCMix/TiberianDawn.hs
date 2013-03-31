@@ -43,7 +43,7 @@ newtype ID = ID Word32
 data Mix =
   Mix
   TopHeader     -- ^ most importantly, gives filecount
-  [EntryHeader] -- ^ length and offset for each file, IN REVERSE ORDER
+  [EntryHeader] -- ^ length and offset for each file
   L.ByteString  -- ^ the files themselves, concatenated together
   deriving (Eq, Show)
 
@@ -138,20 +138,15 @@ instance Binary Mix where
 -- Create/Extract Mix Headers
 --
 
-makeIndex :: Map ID File -> (Int32, [EntryHeader], L.ByteString)
-makeIndex = Map.foldrWithKey foldfunc (0, [], L.empty)
-  where foldfunc i (File n c) (count, es, cs) =
-          (count+len, (EntryHeader (id i n) count len):es, cs `L.append` c)
-          where len = fromIntegral $ L.length c
-                id i []      = i
-                id _ n@(_:_) = stringToID n
-
-
 filesToMixRaw :: Map ID File -> Mix
-filesToMixRaw mp = Mix top ehs files
-  where (size, ehs, files) = makeIndex mp
-        count = length ehs
-        top = TopHeader (fromIntegral count) size
+filesToMixRaw = Map.foldrWithKey foldfunc (Mix (TopHeader 0 0) [] L.empty)
+  where foldfunc i (File n c) (Mix (TopHeader count offset) es cs) = Mix th es' cs'
+          where th  = TopHeader (count+1) $ offset + len   -- top header
+                es' = EntryHeader (id i n) offset len : es -- list of EntryHeader
+                cs' = L.append cs c                        -- concatenated File contents
+                len = fromIntegral $ L.length c            -- length of current file
+                id i []      = i                           -- sanetize ID
+                id _ n@(_:_) = stringToID n
 
 mixToFilesRaw :: Mix -> Map ID File
 mixToFilesRaw (Mix _ entryHeaders entryData) =
@@ -224,22 +219,26 @@ roundTripTest a =
          a2 = encode b2;        b2 = filesToMixRaw c1
          z  = encode (decode a0 :: Map ID File)
 
-         testElseDump bool1 bool2 s =
-           if bool1 == bool2
+         testElseDump val1 val2 s =
+           if val1 == val2
            then print True
            else do print False
-                   --L.writeFile (a ++ s1) bool1
-                   L.writeFile (a ++ s) bool2
+                   L.writeFile (a ++ s) val2
+                   p val1
+                   p val2
+                   putStrLn ""
+           where p = print . showMixHeaders . decode
 
-         testElsePrint bool1 bool2 f =
-           if bool1 == bool2
+         testElsePrint val1 val2 f =
+           if val1 == val2
            then print True
            else do print False
-                   print $ f bool1
-                   print $ f bool2
+                   print $ f val1
+                   print $ f val2
+                   putStrLn ""
 
-     testElseDump a0 a1 "-1"
-     testElsePrint b0 b1 showMixHeaders
+     testElseDump a0 a1 "-1"                                                 -- to Mix
+     testElsePrint b0 b1 showMixHeaders                                      -- to Map ID File
      testElsePrint c0 (Map.map (\(File _ c) -> File [] c) c1) F.showHeaders
      --names stripped so test works, (loading and saving names keeps names in files3)
 
