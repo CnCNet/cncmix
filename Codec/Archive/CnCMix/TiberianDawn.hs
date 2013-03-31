@@ -3,9 +3,6 @@ module Codec.Archive.CnCMix.TiberianDawn
        ( ID()
        ) where
 
-import Prelude hiding (id)
-import qualified Prelude as P
-
 import qualified Codec.Archive.CnCMix.Backend as F
 import Codec.Archive.CnCMix.Backend
   ( File(File)
@@ -22,6 +19,8 @@ import Data.Int
 import Data.Bits
 import Data.Char
 
+import Data.List
+
 import qualified Data.ByteString.Lazy as L
 
 import Data.Binary
@@ -29,7 +28,8 @@ import Data.Binary.Get
 import Data.Binary.Put
 
 import qualified Control.Monad as S
---import qualified Control.Monad.Parallel as P
+
+import Test.QuickCheck
 
 
 --
@@ -123,6 +123,7 @@ instance Binary EntryHeader where
                                                putWord32le $ fromIntegral offset
                                                putWord32le $ fromIntegral size
 
+
 instance Binary Mix where
   get = do top@(TopHeader numFiles _) <- get
            entries <- S.replicateM (fromIntegral numFiles) get
@@ -200,8 +201,45 @@ instance Binary (Map ID File) where
 
 
 --
--- Show Metadata and debug
+-- Testing
 --
+
+instance Arbitrary ID where
+  arbitrary = S.liftM ID arbitrary
+
+instance Arbitrary L.ByteString where
+  arbitrary = S.liftM L.pack arbitrary
+
+instance Arbitrary File where
+  arbitrary = S.liftM2 File arbitrary arbitrary
+
+instance Arbitrary TopHeader where
+  arbitrary = S.liftM2 TopHeader arbitrary arbitrary
+
+instance Arbitrary EntryHeader where
+  arbitrary = S.liftM3 EntryHeader arbitrary arbitrary arbitrary
+
+instance Arbitrary Mix where
+  arbitrary = S.liftM genFromBS arbitrary
+    where genFromBS :: [File]-> Mix
+          genFromBS fs = Mix top (snd $ mapAccumR ebuilder 0 fs) $ L.concat bs
+            where bs = map (\(File _ b) -> b) fs
+                  top = TopHeader (fromIntegral $ length bs) (fromIntegral $ sum $ map L.length bs)
+                  ebuilder :: Int32 -> File -> (Int32, EntryHeader)
+                  ebuilder offset (File n c) = (len, (EntryHeader (stringToID n) offset len))
+                    where len :: Int32
+                          len = fromIntegral $ L.length c
+
+testBinary_TopHeader :: IO ()
+testBinary_TopHeader = quickCheck $ \m -> (m :: TopHeader) == (decode $ encode m)
+
+testBinary_EntryHeader :: IO ()
+testBinary_EntryHeader = quickCheck $ \m -> (m :: EntryHeader) == (decode $ encode m)
+
+testBinary_Mix :: IO ()
+testBinary_Mix = quickCheck $ \m -> (m :: Mix) == (decode $ encode m)
+
+
 
 showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
 showMixHeaders (Mix th ehs _) = (th, ehs)

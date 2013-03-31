@@ -16,7 +16,7 @@ module Codec.Archive.CnCMix.Backend
        , showHeaders
        ) where
 
-import Prelude hiding (read, reads, id)
+import Prelude hiding (read)
 import qualified Prelude as P
 
 import Data.Map (Map())
