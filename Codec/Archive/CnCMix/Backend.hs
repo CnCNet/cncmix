@@ -1,11 +1,10 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Codec.Archive.CnCMix.Backend
        (  File(File)
          -- ID Type Class
        , CnCID
        , stringToID
        , stringToIDRaw
-       , idToNum
-       , numToID
        , idToHex
        , hexToID
          --Generic File3 Functions
@@ -13,6 +12,8 @@ module Codec.Archive.CnCMix.Backend
        , readMany
        , write
        , writeMany
+       , fListToMap
+       , maptoFList
        , showHeaders
        ) where
 
@@ -37,28 +38,29 @@ import qualified Data.Foldable as Y
 import Data.Traversable(Traversable)
 import qualified Data.Traversable as Y
 
-import qualified Control.Monad as S ()
+import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P ()
+
+import Test.QuickCheck
 
 
 --
 -- CnCID Type Class
 --
 
-class (Eq id, Ord id) => CnCID id where
+class (Integral id, Show id, Eq id, Ord id) => CnCID id where
   stringToIDRaw :: String -> id
-  idToNum :: id -> Word32
-  numToID :: Word32 -> id
 
   hexToID :: String -> id
-  hexToID = numToID . fst . head . readHex
+  hexToID = fst . head . readHex
 
   idToHex :: CnCID id => id -> String
-  idToHex = (`showHex` "") . idToNum
+  idToHex = flip showHex ""
 
   stringToID :: String -> id
   stringToID ('0':'x':s) = hexToID s
   stringToID s = stringToIDRaw s
+
 
 
 --
@@ -69,6 +71,15 @@ data File = File
             String       -- ^ the file's name
             L.ByteString -- ^ the file's contents
           deriving (Show, Read, Eq)
+
+instance Arbitrary L.ByteString where
+  arbitrary = S.liftM L.pack arbitrary
+
+instance Arbitrary File where
+  arbitrary = S.liftM2 File arbitrary arbitrary
+
+instance CnCID id => Arbitrary (Map id File) where
+  arbitrary = S.liftM fListToMap arbitrary
 
 --
 -- Porcelain File Operators
@@ -86,6 +97,12 @@ write p (File n@(_:_) c) = L.writeFile (p </> n) c
 
 writeMany :: (Traversable t, Foldable t) => FilePath -> t File -> IO ()
 writeMany = Y.mapM_ . write
+
+fListToMap :: CnCID id => [File] -> Map id File
+fListToMap = Map.fromList . map (\f@(File n _) -> (stringToID n, f))
+
+maptoFList :: CnCID id => Map id File -> [File]
+maptoFList = Map.elems
 
 --
 -- Plumbing File Operators

@@ -1,4 +1,4 @@
-{-# Language FlexibleInstances, OverlappingInstances #-}
+{-# Language FlexibleInstances, OverlappingInstances, GeneralizedNewtypeDeriving #-}
 module Codec.Archive.CnCMix.TiberianDawn
        ( ID()
        ) where
@@ -37,7 +37,7 @@ import Test.QuickCheck
 --
 
 newtype ID = ID Word32
-           deriving (Eq, Ord, Show)
+           deriving (Eq, Ord, Enum, Real, Num, Integral, Arbitrary, Show)
 
 -- | A Command & Conquer: Tiberian Dawn MIX archive.
 data Mix =
@@ -91,8 +91,6 @@ stringToWord32 count accum (x:xs) = stringToWord32
 
 instance CnCID ID where
   stringToIDRaw = ID . word32sToId . stringToWord32s
-  idToNum (ID i) = i
-  numToID = ID
 
 
 --
@@ -134,8 +132,17 @@ instance Binary Mix where
 -- Create/Extract Mix Headers
 --
 
-filesToMixRaw :: Map ID File -> Mix
-filesToMixRaw = Map.foldrWithKey foldfunc (Mix (TopHeader 0 0) [] L.empty)
+fileListToMix :: [File]-> Mix
+fileListToMix fs = Mix top (snd $ mapAccumR ebuilder 0 fs) $ L.concat bs
+  where bs = map (\(File _ b) -> b) fs
+        top = TopHeader (fromIntegral $ length bs) (fromIntegral $ sum $ map L.length bs)
+        ebuilder :: Int32 -> File -> (Int32, EntryHeader)
+        ebuilder offset (File n c) = (len, (EntryHeader (stringToID n) offset len))
+          where len :: Int32
+                len = fromIntegral $ L.length c
+
+fileMapToMix :: Map ID File -> Mix
+fileMapToMix = Map.foldrWithKey foldfunc (Mix (TopHeader 0 0) [] L.empty)
   where foldfunc i (File n c) (Mix (TopHeader count offset) es cs) = Mix th es' cs'
           where th  = TopHeader (count+1) $ offset + len   -- top header
                 es' = EntryHeader (id i n) offset len : es -- list of EntryHeader
@@ -144,8 +151,8 @@ filesToMixRaw = Map.foldrWithKey foldfunc (Mix (TopHeader 0 0) [] L.empty)
                 id i []      = i                           -- sanetize ID
                 id _ n@(_:_) = stringToID n
 
-mixToFilesRaw :: Mix -> Map ID File
-mixToFilesRaw (Mix _ entryHeaders entryData) =
+mixToFileMap :: Mix -> Map ID File
+mixToFileMap (Mix _ entryHeaders entryData) =
   Map.fromList $ map (\(EntryHeader i off len) -> (i, File [] $ headToBS off len)) entryHeaders
   where
     headToBS off len = L.take (fromIntegral len) $ L.drop (fromIntegral off) entryData
@@ -190,23 +197,14 @@ loadNames fs =
 --
 
 instance Binary (Map ID File) where
-  put = put . filesToMixRaw . saveNames
+  put = put . fileMapToMix . saveNames
 
-  get = (return .  loadNames . mixToFilesRaw) =<< get
+  get = (return .  loadNames . mixToFileMap) =<< get
 
 
 --
 -- Testing
 --
-
-instance Arbitrary ID where
-  arbitrary = S.liftM ID arbitrary
-
-instance Arbitrary L.ByteString where
-  arbitrary = S.liftM L.pack arbitrary
-
-instance Arbitrary File where
-  arbitrary = S.liftM2 File arbitrary arbitrary
 
 instance Arbitrary TopHeader where
   arbitrary = S.liftM2 TopHeader arbitrary arbitrary
@@ -215,15 +213,7 @@ instance Arbitrary EntryHeader where
   arbitrary = S.liftM3 EntryHeader arbitrary arbitrary arbitrary
 
 instance Arbitrary Mix where
-  arbitrary = S.liftM genFromBS arbitrary
-    where genFromBS :: [File]-> Mix
-          genFromBS fs = Mix top (snd $ mapAccumR ebuilder 0 fs) $ L.concat bs
-            where bs = map (\(File _ b) -> b) fs
-                  top = TopHeader (fromIntegral $ length bs) (fromIntegral $ sum $ map L.length bs)
-                  ebuilder :: Int32 -> File -> (Int32, EntryHeader)
-                  ebuilder offset (File n c) = (len, (EntryHeader (stringToID n) offset len))
-                    where len :: Int32
-                          len = fromIntegral $ L.length c
+  arbitrary = S.liftM fileListToMix arbitrary
 
 testBinary_TopHeader :: IO ()
 testBinary_TopHeader = quickCheck $ \m -> (m :: TopHeader) == (decode $ encode m)
@@ -234,7 +224,7 @@ testBinary_EntryHeader = quickCheck $ \m -> (m :: EntryHeader) == (decode $ enco
 testBinary_Mix :: IO ()
 testBinary_Mix = quickCheck $ \m -> (m :: Mix) == (decode $ encode m)
 
-
+--
 
 showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
 showMixHeaders (Mix th ehs _) = (th, ehs)
@@ -245,10 +235,10 @@ roundTripTest :: FilePath -> IO ()
 roundTripTest a =
   do a0 <- L.readFile a
      let a1 = encode b0;        b0 = decode a0 :: Mix
-         b1 = filesToMixRaw c0; c0 = mixToFilesRaw b0
+         b1 = fileMapToMix c0;  c0 = mixToFileMap b0
          c1 = saveNames d0;     d0 = loadNames c0
 
-         a2 = encode b2;        b2 = filesToMixRaw c1
+         a2 = encode b2;        b2 = fileMapToMix c1
          z  = encode (decode a0 :: Map ID File)
 
          testElseDump val1 val2 s =

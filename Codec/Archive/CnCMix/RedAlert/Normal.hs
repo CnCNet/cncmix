@@ -23,7 +23,7 @@ import qualified Control.Monad as S
 
 -- Needed to reimplement typeclasses
 newtype ID = ID TD.ID
-           deriving (Eq, Ord, Show, CnCID)
+           deriving (Eq, Ord, Integral, Num, Enum, Real, Show, CnCID)
 
 --
 -- decode/encode Mix
