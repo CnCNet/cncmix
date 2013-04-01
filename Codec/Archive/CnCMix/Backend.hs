@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 module Codec.Archive.CnCMix.Backend
        (  File(File)
          -- ID Type Class
@@ -15,6 +15,7 @@ module Codec.Archive.CnCMix.Backend
        , fListToMap
        , maptoFList
        , showHeaders
+       , testOverall
        ) where
 
 import Prelude hiding (read)
@@ -32,6 +33,7 @@ import Numeric
 import System.FilePath
 import qualified Data.ByteString.Lazy as L
 
+import Data.Binary
 
 import Data.Foldable(Foldable)
 import qualified Data.Foldable as Y
@@ -48,7 +50,8 @@ import Test.QuickCheck
 -- CnCID Type Class
 --
 
-class (Integral id, Show id, Eq id, Ord id) => CnCID id where
+class (Binary (Map id File), Arbitrary id, Integral id, Show id, Eq id, Ord id)
+      => CnCID id where
   stringToIDRaw :: String -> id
 
   hexToID :: String -> id
@@ -60,7 +63,6 @@ class (Integral id, Show id, Eq id, Ord id) => CnCID id where
   stringToID :: String -> id
   stringToID ('0':'x':s) = hexToID s
   stringToID s = stringToIDRaw s
-
 
 
 --
@@ -81,6 +83,7 @@ instance Arbitrary File where
 instance CnCID id => Arbitrary (Map id File) where
   arbitrary = S.liftM fListToMap arbitrary
 
+
 --
 -- Porcelain File Operators
 --
@@ -98,16 +101,20 @@ write p (File n@(_:_) c) = L.writeFile (p </> n) c
 writeMany :: (Traversable t, Foldable t) => FilePath -> t File -> IO ()
 writeMany = Y.mapM_ . write
 
+
+--
+-- Plumbing File Operators & Tests
+--
+
 fListToMap :: CnCID id => [File] -> Map id File
 fListToMap = Map.fromList . map (\f@(File n _) -> (stringToID n, f))
 
 maptoFList :: CnCID id => Map id File -> [File]
 maptoFList = Map.elems
 
---
--- Plumbing File Operators
---
-
 showHeaders :: CnCID id => Map id File -> [(String, String)]
 showHeaders = map pretty . Map.toList
   where pretty (b,(File a _)) = (if a==[] then "<unkown name>" else a, idToHex b)
+
+testOverall :: CnCID id => Map id File -> Bool
+testOverall m = m == (decode $ encode m)

@@ -224,6 +224,8 @@ testBinary_EntryHeader = quickCheck $ \m -> (m :: EntryHeader) == (decode $ enco
 testBinary_Mix :: IO ()
 testBinary_Mix = quickCheck $ \m -> (m :: Mix) == (decode $ encode m)
 
+testBinary_Map = quickCheck (F.testOverall :: Map ID File -> Bool)
+
 --
 
 showMixHeaders :: Mix -> (TopHeader, [EntryHeader])

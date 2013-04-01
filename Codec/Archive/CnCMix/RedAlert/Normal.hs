@@ -20,10 +20,11 @@ import Data.Binary.Put
 import qualified Control.Monad as S
 --import qualified Control.Monad.Parallel as P
 
+import Test.QuickCheck
 
 -- Needed to reimplement typeclasses
 newtype ID = ID TD.ID
-           deriving (Eq, Ord, Integral, Num, Enum, Real, Show, CnCID)
+           deriving (Eq, Ord, Integral, Num, Enum, Real, Show, Arbitrary, CnCID)
 
 --
 -- decode/encode Mix
