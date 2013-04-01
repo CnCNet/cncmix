@@ -86,13 +86,8 @@ stringToWord32 4     accum _      = accum
 stringToWord32 _     accum []     = accum
 stringToWord32 count accum (x:xs) = stringToWord32
                                     (count + 1)
-                                    (accum + shiftL (asciiCharToWord32 x) (count*8))
+                                    (accum + shiftL (fromIntegral $ fromEnum $ toUpper x) (count*8))
                                     xs
-
-asciiCharToWord32 :: Char -> Word32
-asciiCharToWord32 c
-  | isAscii c = fromIntegral $ fromEnum $ toUpper c
-  | otherwise = error "non-ascii"
 
 instance CnCID ID where
   stringToIDRaw = ID . word32sToId . stringToWord32s
@@ -243,7 +238,6 @@ testBinary_Mix = quickCheck $ \m -> (m :: Mix) == (decode $ encode m)
 
 showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
 showMixHeaders (Mix th ehs _) = (th, ehs)
-
 
 -- Only is accurate if the mix has a local mix database as the FIRST file and entry
 -- (Will read local mix database from any position, but only writes it there)
