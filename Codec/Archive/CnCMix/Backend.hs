@@ -12,8 +12,8 @@ module Codec.Archive.CnCMix.Backend
        , readMany
        , write
        , writeMany
-       , fListToMap
-       , maptoFList
+       , listToMap
+       , mapToList
        , showHeaders
        , testOverall
        ) where
@@ -81,7 +81,7 @@ instance Arbitrary File where
   arbitrary = S.liftM2 File arbitrary arbitrary
 
 instance CnCID id => Arbitrary (Map id File) where
-  arbitrary = S.liftM fListToMap arbitrary
+  arbitrary = S.liftM listToMap arbitrary
 
 
 --
@@ -106,11 +106,11 @@ writeMany = Y.mapM_ . write
 -- Plumbing File Operators & Tests
 --
 
-fListToMap :: CnCID id => [File] -> Map id File
-fListToMap = Map.fromList . map (\f@(File n _) -> (stringToID n, f))
+listToMap :: CnCID id => [File] -> Map id File
+listToMap = Map.fromList . map (\f@(File n _) -> (stringToID n, f))
 
-maptoFList :: CnCID id => Map id File -> [File]
-maptoFList = Map.elems
+mapToList :: CnCID id => Map id File -> [File]
+mapToList = Map.elems
 
 showHeaders :: CnCID id => Map id File -> [(String, String)]
 showHeaders = map pretty . Map.toList

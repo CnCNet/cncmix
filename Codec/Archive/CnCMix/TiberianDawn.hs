@@ -132,15 +132,6 @@ instance Binary Mix where
 -- Create/Extract Mix Headers
 --
 
-fileListToMix :: [File]-> Mix
-fileListToMix fs = Mix top (snd $ mapAccumR ebuilder 0 fs) $ L.concat bs
-  where bs = map (\(File _ b) -> b) fs
-        top = TopHeader (fromIntegral $ length bs) (fromIntegral $ sum $ map L.length bs)
-        ebuilder :: Int32 -> File -> (Int32, EntryHeader)
-        ebuilder offset (File n c) = (len, (EntryHeader (stringToID n) offset len))
-          where len :: Int32
-                len = fromIntegral $ L.length c
-
 fileMapToMix :: Map ID File -> Mix
 fileMapToMix = Map.foldrWithKey foldfunc (Mix (TopHeader 0 0) [] L.empty)
   where foldfunc i (File n c) (Mix (TopHeader count offset) es cs) = Mix th es' cs'
@@ -154,9 +145,9 @@ fileMapToMix = Map.foldrWithKey foldfunc (Mix (TopHeader 0 0) [] L.empty)
 mixToFileMap :: Mix -> Map ID File
 mixToFileMap (Mix _ entryHeaders entryData) =
   Map.fromList $ map (\(EntryHeader i off len) -> (i, File [] $ headToBS off len)) entryHeaders
-  where
-    headToBS off len = L.take (fromIntegral len) $ L.drop (fromIntegral off) entryData
+  where headToBS a b = takeSubRange a b entryData
 
+takeSubRange off len = L.take (fromIntegral len) . L.drop (fromIntegral off)
 
 --
 -- Using Local Mix Databases
@@ -206,6 +197,20 @@ instance Binary (Map ID File) where
 -- Testing
 --
 
+fileListToMix :: [File] -> Mix
+fileListToMix fs = Mix top (snd $ mapAccumR ebuilder 0 fs) $ L.concat bs
+  where bs = map (\(File _ b) -> b) fs
+        top = TopHeader (fromIntegral $ length bs) (fromIntegral $ sum $ map L.length bs)
+        ebuilder :: Int32 -> File -> (Int32, EntryHeader)
+        ebuilder offset (File n c) = (len, (EntryHeader (stringToID n) offset len))
+          where len :: Int32
+                len = fromIntegral $ L.length c
+
+mixToFileList :: Mix -> [(ID, File)]
+mixToFileList (Mix _ entryHeaders entryData) =
+  map (\(EntryHeader i off len) -> (i, File [] (headToBS off len))) entryHeaders
+  where headToBS a b = takeSubRange a b entryData
+
 instance Arbitrary TopHeader where
   arbitrary = S.liftM2 TopHeader arbitrary arbitrary
 
@@ -224,7 +229,28 @@ testBinary_EntryHeader = quickCheck $ \m -> (m :: EntryHeader) == (decode $ enco
 testBinary_Mix :: IO ()
 testBinary_Mix = quickCheck $ \m -> (m :: Mix) == (decode $ encode m)
 
+testBinary_Map :: IO ()
 testBinary_Map = quickCheck (F.testOverall :: Map ID File -> Bool)
+
+testBinary_List = quickCheck test
+  where test :: [File] -> Bool
+        test fs = (arb1 fs) == (arb2 $ mixToFileList $ fileListToMix fs)
+        arb1 = map $ \(File n c) -> (stringToID n , c)
+        arb2 = map $ \(i,(File _ c)) -> (i , c)
+
+-- -- FileMapToMix not use
+-- testBinary_ToMap :: IO ()
+-- testBinary_ToMap = quickCheck test
+--   where test :: [File] -> Bool
+--         test fs = (F.listToMap fs) == (decode mix :: Map ID File)
+--           where mix = encode $ fileListToMix fs
+
+-- -- FileMapToMix not use
+-- testBinary_FromMap :: IO ()
+-- testBinary_FromMap = quickCheck test
+--   where test :: Map ID File -> Bool
+--         test fm = map snd $ F.mapToList fm == mixToFileList decode mix
+--           where mix = encode fm
 
 --
 
