@@ -232,25 +232,22 @@ testBinary_Mix = quickCheck $ \m -> (m :: Mix) == (decode $ encode m)
 testBinary_Map :: IO ()
 testBinary_Map = quickCheck (F.testOverall :: Map ID File -> Bool)
 
+noNames :: [(t, File)] -> [(t, L.ByteString)]
+noNames = map $ \(i,(File _ c)) -> (i , c)
+
+testBinary_List :: IO ()
 testBinary_List = quickCheck test
   where test :: [File] -> Bool
-        test fs = (arb1 fs) == (arb2 $ mixToFileList $ fileListToMix fs)
-        arb1 = map $ \(File n c) -> (stringToID n , c)
-        arb2 = map $ \(i,(File _ c)) -> (i , c)
+        test fs = (nn2 fs) == (noNames $ mixToFileList $ fileListToMix fs)
+        nn2 = map $ \(File n c) -> (stringToID n , c)
 
--- -- FileMapToMix not use
--- testBinary_ToMap :: IO ()
--- testBinary_ToMap = quickCheck test
---   where test :: [File] -> Bool
---         test fs = (F.listToMap fs) == (decode mix :: Map ID File)
---           where mix = encode $ fileListToMix fs
+testBinary_AllToMix :: IO ()
+testBinary_AllToMix = quickCheck $ \fs ->
+  (fileListToMix (fs :: [File])) == (fileMapToMix $ F.listToMap fs)
 
--- -- FileMapToMix not use
--- testBinary_FromMap :: IO ()
--- testBinary_FromMap = quickCheck test
---   where test :: Map ID File -> Bool
---         test fm = map snd $ F.mapToList fm == mixToFileList decode mix
---           where mix = encode fm
+testBinary_AllFromMix :: IO ()
+testBinary_AllFromMix = quickCheck $ \fs ->
+  (noNames $ mixToFileList (fs :: Mix)) == noNames (Map.toList $ mixToFileMap $ fs)
 
 --
 

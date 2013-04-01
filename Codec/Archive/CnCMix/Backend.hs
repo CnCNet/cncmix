@@ -13,7 +13,6 @@ module Codec.Archive.CnCMix.Backend
        , write
        , writeMany
        , listToMap
-       , mapToList
        , showHeaders
        , testOverall
        ) where
@@ -108,9 +107,6 @@ writeMany = Y.mapM_ . write
 
 listToMap :: CnCID id => [File] -> Map id File
 listToMap = Map.fromList . map (\f@(File n _) -> (stringToID n, f))
-
-mapToList :: CnCID id => Map id File -> [File]
-mapToList = Map.elems
 
 showHeaders :: CnCID id => Map id File -> [(String, String)]
 showHeaders = map pretty . Map.toList
