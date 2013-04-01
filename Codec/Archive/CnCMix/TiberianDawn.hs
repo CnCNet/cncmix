@@ -220,34 +220,40 @@ instance Arbitrary EntryHeader where
 instance Arbitrary Mix where
   arbitrary = S.liftM fileListToMix arbitrary
 
+roundTrip :: Binary a => a -> a
+roundTrip = decode . encode
+
+testRoundTrip :: (Eq a, Show a, Arbitrary a) => (a -> a) -> IO ()
+testRoundTrip = quickCheck . F.testRoundTrip
+
 testBinary_TopHeader :: IO ()
-testBinary_TopHeader = quickCheck $ \m -> (m :: TopHeader) == (decode $ encode m)
+testBinary_TopHeader = testRoundTrip (roundTrip :: TopHeader -> TopHeader)
 
 testBinary_EntryHeader :: IO ()
-testBinary_EntryHeader = quickCheck $ \m -> (m :: EntryHeader) == (decode $ encode m)
+testBinary_EntryHeader = testRoundTrip (roundTrip :: EntryHeader -> EntryHeader)
 
 testBinary_Mix :: IO ()
-testBinary_Mix = quickCheck $ \m -> (m :: Mix) == (decode $ encode m)
+testBinary_Mix = testRoundTrip (roundTrip :: Mix -> Mix)
 
 testBinary_Map :: IO ()
-testBinary_Map = quickCheck (F.testOverall :: Map ID File -> Bool)
+testBinary_Map = testRoundTrip (roundTrip :: Map ID File -> Map ID File)
 
 noNames :: [(t, File)] -> [(t, L.ByteString)]
 noNames = map $ \(i,(File _ c)) -> (i , c)
 
 testBinary_List :: IO ()
 testBinary_List = quickCheck test
-  where test :: [File] -> Bool
-        test fs = (nn2 fs) == (noNames $ mixToFileList $ fileListToMix fs)
-        nn2 = map $ \(File n c) -> (stringToID n , c)
+  where test :: [File] -> ([(ID, L.ByteString)], [(ID, L.ByteString)])
+        test fs = (nnAlt fs , (noNames $ mixToFileList $ fileListToMix fs))
+        nnAlt = map $ \(File n c) -> (stringToID n , c)
 
 testBinary_AllToMix :: IO ()
 testBinary_AllToMix = quickCheck $ \fs ->
-  (fileListToMix (fs :: [File])) == (fileMapToMix $ F.listToMap fs)
+  (fileListToMix (fs :: [File]) , (fileMapToMix $ F.listToMap fs))
 
 testBinary_AllFromMix :: IO ()
-testBinary_AllFromMix = quickCheck $ \fs ->
-  (noNames $ mixToFileList (fs :: Mix)) == noNames (Map.toList $ mixToFileMap $ fs)
+testBinary_AllFromMix = verboseCheck $ \fs ->
+  (noNames $ mixToFileList (fs :: Mix) , (noNames $ Map.toList $ mixToFileMap $ fs))
 
 --
 

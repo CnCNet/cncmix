@@ -14,7 +14,7 @@ module Codec.Archive.CnCMix.Backend
        , writeMany
        , listToMap
        , showHeaders
-       , testOverall
+       , testRoundTrip
        ) where
 
 import Prelude hiding (read)
@@ -112,5 +112,9 @@ showHeaders :: CnCID id => Map id File -> [(String, String)]
 showHeaders = map pretty . Map.toList
   where pretty (b,(File a _)) = (if a==[] then "<unkown name>" else a, idToHex b)
 
-testOverall :: CnCID id => Map id File -> Bool
-testOverall m = m == (decode $ encode m)
+ -- test equal
+instance (Eq a, Show a) => Testable (a,a) where
+  property (a,b) = property $ whenFail (print a >> print b) $ a == b
+
+testRoundTrip :: (Eq a, Show a, Arbitrary a) => (a -> a) -> Property 
+testRoundTrip f = property $ \a -> let b = f a in whenFail (print b) $ a == b
