@@ -133,13 +133,15 @@ instance Binary Mix where
 --
 
 fileMapToMix :: Map ID File -> Mix
-fileMapToMix = Map.foldrWithKey foldfunc (Mix (TopHeader 0 0) [] L.empty)
-  where foldfunc i (File n c) (Mix (TopHeader count offset) es cs) = Mix th es' cs'
-          where th  = TopHeader (count+1) $ offset + len   -- top header
-                es' = EntryHeader (id i n) offset len : es -- list of EntryHeader
-                cs' = L.append cs c                        -- concatenated File contents
-                len = fromIntegral $ L.length c            -- length of current file
-                id i []      = i                           -- sanetize ID
+fileMapToMix fm = Mix topH (Map.elems entryHs) concatFiles
+  where concatFiles = L.concat $ Map.elems $ Map.map (\(File _ b) -> b) fm
+        (topH, entryHs) = Map.mapAccumWithKey headerbuilder (TopHeader 0 0) fm
+        headerbuilder :: TopHeader -> ID -> File -> (TopHeader, EntryHeader)
+        headerbuilder (TopHeader count offset) i (File n c) =
+          (TopHeader (count+1) $ offset+len , (EntryHeader (id i n) offset len))
+          where len :: Int32
+                len = fromIntegral $ L.length c -- length of current file
+                id i []      = i                -- sanetize ID
                 id _ n@(_:_) = stringToID n
 
 mixToFileMap :: Mix -> Map ID File
@@ -197,14 +199,16 @@ instance Binary (Map ID File) where
 -- Testing
 --
 
-fileListToMix :: [File] -> Mix
-fileListToMix fs = Mix top (snd $ mapAccumR ebuilder 0 fs) $ L.concat bs
-  where bs = map (\(File _ b) -> b) fs
-        top = TopHeader (fromIntegral $ length bs) (fromIntegral $ sum $ map L.length bs)
-        ebuilder :: Int32 -> File -> (Int32, EntryHeader)
-        ebuilder offset (File n c) = (len, (EntryHeader (stringToID n) offset len))
+fileListToMix :: [(ID, File)] -> Mix
+fileListToMix fs = Mix topH entryHs $ L.concat $ map (\(_,(File _ b)) -> b) fs
+  where (topH, entryHs) = mapAccumL headerbuilder (TopHeader 0 0) fs
+        headerbuilder :: TopHeader -> (ID, File) -> (TopHeader, EntryHeader)
+        headerbuilder (TopHeader count offset) (i, (File n c)) =
+          (TopHeader (count+1) $ offset+len , (EntryHeader (id i n) offset len))
           where len :: Int32
-                len = fromIntegral $ L.length c
+                len = fromIntegral $ L.length c -- length of current file
+                id i []      = i                -- sanetize ID
+                id _ n@(_:_) = stringToID n
 
 mixToFileList :: Mix -> [(ID, File)]
 mixToFileList (Mix _ entryHeaders entryData) =
@@ -226,75 +230,33 @@ roundTrip = decode . encode
 testRoundTrip :: (Eq a, Show a, Arbitrary a) => (a -> a) -> IO ()
 testRoundTrip = quickCheck . F.testRoundTrip
 
-testBinary_TopHeader :: IO ()
-testBinary_TopHeader = testRoundTrip (roundTrip :: TopHeader -> TopHeader)
+testTopHeader :: IO ()
+testTopHeader = testRoundTrip (roundTrip :: TopHeader -> TopHeader)
 
-testBinary_EntryHeader :: IO ()
-testBinary_EntryHeader = testRoundTrip (roundTrip :: EntryHeader -> EntryHeader)
+testEntryHeader :: IO ()
+testEntryHeader = testRoundTrip (roundTrip :: EntryHeader -> EntryHeader)
 
-testBinary_Mix :: IO ()
-testBinary_Mix = testRoundTrip (roundTrip :: Mix -> Mix)
+testMix :: IO ()
+testMix = testRoundTrip (roundTrip :: Mix -> Mix)
 
-testBinary_Map :: IO ()
-testBinary_Map = testRoundTrip (roundTrip :: Map ID File -> Map ID File)
+testAllToMix :: IO ()
+testAllToMix = quickCheck $ \fs ->
+  (fileListToMix $ Map.toList (fs :: Map ID File) , fileMapToMix fs)
 
-noNames :: [(t, File)] -> [(t, L.ByteString)]
-noNames = map $ \(i,(File _ c)) -> (i , c)
+testAllFromMix :: IO ()
+testAllFromMix = quickCheck $ \fs ->
+  (Map.fromList $ mixToFileList (fs :: Mix) , mixToFileMap fs)
 
-testBinary_List :: IO ()
-testBinary_List = quickCheck test
-  where test :: [File] -> ([(ID, L.ByteString)], [(ID, L.ByteString)])
-        test fs = (nnAlt fs , (noNames $ mixToFileList $ fileListToMix fs))
-        nnAlt = map $ \(File n c) -> (stringToID n , c)
+testList :: IO ()
+testList = testRoundTrip $ fileListToMix . mixToFileList
 
-testBinary_AllToMix :: IO ()
-testBinary_AllToMix = quickCheck $ \fs ->
-  (fileListToMix (fs :: [File]) , (fileMapToMix $ F.listToMap fs))
+testMapNoLMD :: IO ()
+testMapNoLMD = quickCheck test
+  where test fm = (mix, (fileMapToMix $ mixToFileMap mix))
+                -- Needs to be initially sorted for test to work
+          where mix = fileMapToMix fm
 
-testBinary_AllFromMix :: IO ()
-testBinary_AllFromMix = verboseCheck $ \fs ->
-  (noNames $ mixToFileList (fs :: Mix) , (noNames $ Map.toList $ mixToFileMap $ fs))
+testNames = testRoundTrip $ loadNames . saveNames
 
---
-
-showMixHeaders :: Mix -> (TopHeader, [EntryHeader])
-showMixHeaders (Mix th ehs _) = (th, ehs)
-
--- Only is accurate if the mix has a local mix database as the FIRST file and entry
--- (Will read local mix database from any position, but only writes it there)
-roundTripTest :: FilePath -> IO ()
-roundTripTest a =
-  do a0 <- L.readFile a
-     let a1 = encode b0;        b0 = decode a0 :: Mix
-         b1 = fileMapToMix c0;  c0 = mixToFileMap b0
-         c1 = saveNames d0;     d0 = loadNames c0
-
-         a2 = encode b2;        b2 = fileMapToMix c1
-         z  = encode (decode a0 :: Map ID File)
-
-         testElseDump val1 val2 s =
-           if val1 == val2
-           then print True
-           else do print False
-                   L.writeFile (a ++ s) val2
-                   p val1
-                   p val2
-                   putStrLn ""
-           where p = print . showMixHeaders . decode
-
-         testElsePrint val1 val2 f =
-           if val1 == val2
-           then print True
-           else do print False
-                   print $ f val1
-                   print $ f val2
-                   putStrLn ""
-
-     testElseDump a0 a1 "-1"                                                 -- to Mix
-     testElsePrint b0 b1 showMixHeaders                                      -- to Map ID File
-     testElsePrint c0 (Map.map (\(File _ c) -> File [] c) c1) F.showHeaders
-     --names stripped so test works, (loading and saving names keeps names in files3)
-
-     testElseDump a0 a2 "-2"
-     testElsePrint b0 b2 showMixHeaders
-     testElseDump a0 z "-3"
+testMap :: IO ()
+testMap = testRoundTrip (roundTrip :: Map ID File -> Map ID File)
