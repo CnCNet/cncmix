@@ -19,10 +19,7 @@ import Data.Binary.Put
 
 --import Foreign.Storable (sizeOf)
 
-import Data.Foldable(Foldable)
 import qualified Data.Foldable as Y
-import Data.Traversable(Traversable)
-import qualified Data.Traversable as Y
 
 import qualified Control.Monad as S
 
@@ -43,7 +40,7 @@ instance CnCID id => Binary (LocalMixDatabase id) where
   get = do skip 32 -- $ sizeOf (0 :: Word8) * 32                         -- tagline
            skip 16 -- $ sizeOf (0 :: Word64) * 2                         -- total size in bytes
            count <- getWord32le                                          -- number of files
-           S.liftM LocalMixDatabase $ replicateToMap (fromIntegral count) kv
+           S.liftM LocalMixDatabase $ replicateToMap count kv
     where kv :: Get (id, String)                                         -- ID-String pair
           kv = do name <- S.liftM C.unpack getLazyByteStringNul          -- get filename
                   return (stringToID name, name)
@@ -60,8 +57,8 @@ replicateToMap :: (Monad m, Num i, Ord i, Ord k) => i -> m (k, v) -> m (Map k v)
 replicateToMap count prog
   | count <= 0 = return $ Map.empty
   | count >  0 = do (key, value) <- prog
-                    map <- replicateToMap (count - 1) prog
-                    return (Map.insert key value map)
+                    oldMap <- replicateToMap (count - 1) prog
+                    return (Map.insert key value oldMap)
 
 --
 -- Testing
@@ -69,7 +66,8 @@ replicateToMap count prog
 
 instance CnCID id => Arbitrary (LocalMixDatabase id) where
   arbitrary = S.liftM
-              (LocalMixDatabase . Map.fromList . map (\str -> (F.stringToID str, str)))
+              (LocalMixDatabase . Map.fromList
+               . map ((\str -> (F.stringToID str, str)) . filter (/= '\NUL')))
               arbitrary
 
 testPutStr :: IO ()

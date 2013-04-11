@@ -23,10 +23,6 @@ import qualified Prelude as P
 import Data.Map (Map())
 import qualified Data.Map as Map
 
-import Data.Word
-import Data.Maybe
-import Data.Either
-
 import Numeric
 
 import System.FilePath
@@ -77,7 +73,9 @@ instance Arbitrary L.ByteString where
   arbitrary = S.liftM L.pack arbitrary
 
 instance Arbitrary File where
-  arbitrary = S.liftM2 File arbitrary arbitrary
+  -- can't contain NULL due to local mix database
+  arbitrary = S.liftM2 File (S.liftM (filter (/= '\NUL')) arbitrary) arbitrary
+
 
 instance CnCID id => Arbitrary (Map id File) where
   arbitrary = S.liftM listToMap arbitrary
@@ -110,11 +108,11 @@ listToMap = Map.fromList . map (\f@(File n _) -> (stringToID n, f))
 
 showHeaders :: CnCID id => Map id File -> [(String, String)]
 showHeaders = map pretty . Map.toList
-  where pretty (b,(File a _)) = (if a==[] then "<unkown name>" else a, idToHex b)
+  where pretty (b, File a _) = (if a==[] then "<unkown name>" else a, idToHex b)
 
  -- test equal
 instance (Eq a, Show a) => Testable (a,a) where
-  property (a,b) = property $ whenFail (print a >> print b) $ a == b
+  property (a, b) = property $ whenFail (print a >> print b) $ a == b
 
 testRoundTrip :: (Eq a, Show a, Arbitrary a) => (a -> a) -> Property 
 testRoundTrip f = property $ \a -> let b = f a in whenFail (print b) $ a == b
