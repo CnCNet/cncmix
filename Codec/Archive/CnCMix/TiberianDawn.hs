@@ -79,7 +79,6 @@ stringToWord32s [] = []
 stringToWord32s a@(_:_)
   | length a<=4 = [stringToWord32 0 0 a]
   | length a>4  = stringToWord32 0 0 (take 4 a) : stringToWord32s (drop 4 a)
-  | otherwise   = error "huh? shouldn't get here"
 
 stringToWord32 :: Int -> Word32 -> String -> Word32
 stringToWord32 4     accum _      = accum
@@ -105,7 +104,6 @@ instance Binary TopHeader where
   put (TopHeader fileCount sumFileSize) = do putWord16le $ fromIntegral fileCount
                                              putWord32le $ fromIntegral sumFileSize
 
-
 instance Binary EntryHeader where
   get = do hash <- getWord32le
            offset <- getWord32le
@@ -115,7 +113,6 @@ instance Binary EntryHeader where
   put (EntryHeader (ID hash) offset size) = do putWord32le hash
                                                putWord32le $ fromIntegral offset
                                                putWord32le $ fromIntegral size
-
 
 instance Binary Mix where
   get = do top@(TopHeader numFiles _) <- get
@@ -132,24 +129,27 @@ instance Binary Mix where
 -- Create/Extract Mix Headers
 --
 
+mkID :: ID -> String -> ID -- sanetize ID
+mkID i []      = i
+mkID _ n@(_:_) = stringToID n
+
+takeSubRange :: (Integral a, Integral b) => a -> b -> L.ByteString -> L.ByteString
+takeSubRange off len = L.take (fromIntegral len) . L.drop (fromIntegral off)
+
 fileMapToMix :: Map ID File -> Mix
 fileMapToMix fm = Mix topH (Map.elems entryHs) concatFiles
   where concatFiles = L.concat $ Map.elems $ Map.map (\(File _ b) -> b) fm
         (topH, entryHs) = Map.mapAccumWithKey headerbuilder (TopHeader 0 0) fm
         headerbuilder :: TopHeader -> ID -> File -> (TopHeader, EntryHeader)
         headerbuilder (TopHeader count offset) i (File n c) =
-          (TopHeader (count+1) $ offset+len , (EntryHeader (id i n) offset len))
+          (TopHeader (count+1) $ offset+len , (EntryHeader (mkID i n) offset len))
           where len :: Int32
                 len = fromIntegral $ L.length c -- length of current file
-                id i []      = i                -- sanetize ID
-                id _ n@(_:_) = stringToID n
 
 mixToFileMap :: Mix -> Map ID File
 mixToFileMap (Mix _ entryHeaders entryData) =
   Map.fromList $ map (\(EntryHeader i off len) -> (i, File [] $ headToBS off len)) entryHeaders
   where headToBS a b = takeSubRange a b entryData
-
-takeSubRange off len = L.take (fromIntegral len) . L.drop (fromIntegral off)
 
 --
 -- Using Local Mix Databases
@@ -169,18 +169,18 @@ saveNames fs = if Map.size names /= 0
         mapper (File []          _) = Nothing
         mapper (File ('0':'x':_) _) = Nothing
         mapper (File n           _) = Just n
-        lmd = File [] $ encode $ LocalMixDatabase names
+        lmd = File lmdName $ encode $ LocalMixDatabase names
 
 loadNames :: Map ID File -> Map ID File
 loadNames fs =
   case q of
     Nothing -> fs
     -- differenceWith ensures that orphan filnames from the LMD are not added
-    (Just (File n c)) -> Map.differenceWith update proper names
+    (Just (File _ lmd)) -> Map.differenceWith update proper names
       where update :: File -> String -> Maybe File
             update (File _  c) n = Just $ File n c -- found match
             -- we want to remove file TODO: add contents check to make sure we actually have an LMD
-            names = getLMD $ decode c
+            names = getLMD $ decode lmd
 
   where (q, proper) = Map.updateLookupWithKey (\_ _ -> Nothing) lmdID fs
 
@@ -204,11 +204,9 @@ fileListToMix fs = Mix topH entryHs $ L.concat $ map (\(_,(File _ b)) -> b) fs
   where (topH, entryHs) = mapAccumL headerbuilder (TopHeader 0 0) fs
         headerbuilder :: TopHeader -> (ID, File) -> (TopHeader, EntryHeader)
         headerbuilder (TopHeader count offset) (i, (File n c)) =
-          (TopHeader (count+1) $ offset+len , (EntryHeader (id i n) offset len))
+          (TopHeader (count+1) $ offset+len , (EntryHeader (mkID i n) offset len))
           where len :: Int32
                 len = fromIntegral $ L.length c -- length of current file
-                id i []      = i                -- sanetize ID
-                id _ n@(_:_) = stringToID n
 
 mixToFileList :: Mix -> [(ID, File)]
 mixToFileList (Mix _ entryHeaders entryData) =
@@ -256,6 +254,7 @@ testMapNoLMD = quickCheck test
                 -- Needs to be initially sorted for test to work
           where mix = fileMapToMix fm
 
+testNames :: IO ()
 testNames = testRoundTrip $ loadNames . saveNames
 
 testMap :: IO ()
