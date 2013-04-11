@@ -56,10 +56,12 @@ instance CnCID id => Binary (LocalMixDatabase id) where
        putWord32le $ fromIntegral $ Map.size fileNames                   -- number of strings
        Y.mapM_ putAsCString fileNames                                    -- filenames themselves
 
-replicateToMap :: (Monad m, Num i, Ord k) => i -> m (k, v) -> m (Map k v)
-replicateToMap n prog = do (k,v) <- prog
-                           m <- replicateToMap (n-1) prog
-                           return (Map.insert k v m)
+replicateToMap :: (Monad m, Num i, Ord i, Ord k) => i -> m (k, v) -> m (Map k v)
+replicateToMap count prog
+  | count <= 0 = return $ Map.empty
+  | count >  0 = do (key, value) <- prog
+                    map <- replicateToMap (count - 1) prog
+                    return (Map.insert key value map)
 
 --
 -- Testing
@@ -76,12 +78,12 @@ testPutStr = quickCheck test
 
 testStringRoundTrip :: IO ()
 testStringRoundTrip = quickCheck test
-  where test str = safe == (C.unpack $ runGet getLazyByteStringNul $ runPut $ putAsCString safe)
+  where test str = (safe, C.unpack $ runGet getLazyByteStringNul $ runPut $ putAsCString safe)
           where safe = filter (/= '\NUL') str
 
 testStringsRoundTrip :: IO ()
 testStringsRoundTrip = quickCheck test
-  where test strs = safes' == safes
+  where test strs = (safes',safes)
           where safes' :: [String]
                 safes' = runGet (S.replicateM len $ S.liftM C.unpack getLazyByteStringNul) bytes
                 bytes :: C.ByteString
