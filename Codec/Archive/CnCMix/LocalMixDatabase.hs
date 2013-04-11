@@ -40,8 +40,8 @@ lengthLMD :: Map b [a] -> Int
 lengthLMD l = Map.size l + 52 + Map.foldl (\ o n -> o + length n) 0 l
 
 instance CnCID id => Binary (LocalMixDatabase id) where
-  get = do skip 32 -- $ sizeOf (0 :: Word8) * 32                         -- Static info
-           skip 16 -- $ sizeOf (0 :: Word64) * 2                         -- total size
+  get = do skip 32 -- $ sizeOf (0 :: Word8) * 32                         -- tagline
+           skip 16 -- $ sizeOf (0 :: Word64) * 2                         -- total size in bytes
            count <- getWord32le                                          -- number of files
            S.liftM LocalMixDatabase $ replicateToMap (fromIntegral count) kv
     where kv :: Get (id, String)                                         -- ID-String pair
@@ -49,10 +49,10 @@ instance CnCID id => Binary (LocalMixDatabase id) where
                   return (stringToID name, name)
 
   put (LocalMixDatabase fileNames) =
-    do putLazyByteString $ C.pack "XCC by Olaf van der Spek"
-       S.mapM_ putWord8 [0x1A, 0x04, 0x17, 0x27, 0x10, 0x19, 0x80, 0x00] -- a random constant
-       putWord64le $ fromIntegral $ lengthLMD fileNames                  -- size of database
-       S.replicateM_ 8 $ putWord8 0                                      -- padding
+    do putLazyByteString $ C.pack "XCC by Olaf van der Spek"             -- tagline           24 bytes
+       S.mapM_ putWord8 [0x1A, 0x04, 0x17, 0x27, 0x10, 0x19, 0x80, 0x00] -- a random constant  8 bytes
+       putWord64le $ fromIntegral $ lengthLMD fileNames                  -- size of database   8 bytes
+       S.replicateM_ 8 $ putWord8 0                                      -- padding            8 bytes
        putWord32le $ fromIntegral $ Map.size fileNames                   -- number of strings
        Y.mapM_ putAsCString fileNames                                    -- filenames themselves
 
@@ -69,3 +69,22 @@ instance CnCID id => Arbitrary (LocalMixDatabase id) where
   arbitrary = S.liftM
               (LocalMixDatabase . Map.fromList . map (\str -> (F.stringToID str, str)))
               arbitrary
+
+testPutStr :: IO ()
+testPutStr = quickCheck test
+  where test str = (fromIntegral $ length str + 1) == (C.length $ runPut $ putAsCString str)
+
+testStringRoundTrip :: IO ()
+testStringRoundTrip = quickCheck test
+  where test str = safe == (C.unpack $ runGet getLazyByteStringNul $ runPut $ putAsCString safe)
+          where safe = filter (/= '\NUL') str
+
+testStringsRoundTrip :: IO ()
+testStringsRoundTrip = quickCheck test
+  where test strs = safes' == safes
+          where safes' :: [String]
+                safes' = runGet (S.replicateM len $ S.liftM C.unpack getLazyByteStringNul) bytes
+                bytes :: C.ByteString
+                bytes = runPut $ S.mapM_ putAsCString safes
+                len = length strs
+                safes = map (filter (/= '\NUL')) strs
