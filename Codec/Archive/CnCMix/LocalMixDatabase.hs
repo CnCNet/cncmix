@@ -6,6 +6,7 @@ module Codec.Archive.CnCMix.LocalMixDatabase
        ) where
 
 import Codec.Archive.CnCMix.Backend(CnCID,stringToID)
+import qualified Codec.Archive.CnCMix.Backend as F
 
 import qualified Data.ByteString.Lazy.Char8 as C
 
@@ -24,10 +25,12 @@ import Data.Traversable(Traversable)
 import qualified Data.Traversable as Y
 
 import qualified Control.Monad as S
---import qualified Control.Monad.Parallel as P
+
+import Test.QuickCheck
 
 
 newtype LocalMixDatabase id = LocalMixDatabase { getLMD :: Map id String }
+                            deriving (Eq, Show)
 
 putAsCString :: [Char] -> PutM ()
 putAsCString s = do putLazyByteString $ C.pack s
@@ -57,3 +60,12 @@ replicateToMap :: (Monad m, Num i, Ord k) => i -> m (k, v) -> m (Map k v)
 replicateToMap n prog = do (k,v) <- prog
                            m <- replicateToMap (n-1) prog
                            return (Map.insert k v m)
+
+--
+-- Testing
+--
+
+instance CnCID id => Arbitrary (LocalMixDatabase id) where
+  arbitrary = S.liftM
+              (LocalMixDatabase . Map.fromList . map (\str -> (F.stringToID str, str)))
+              arbitrary

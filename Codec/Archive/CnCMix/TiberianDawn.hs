@@ -260,3 +260,6 @@ testNames = testRoundTrip $ loadNames . saveNames
 
 testMap :: IO ()
 testMap = testRoundTrip (roundTrip :: Map ID File -> Map ID File)
+
+testLMD :: IO ()
+testLMD = testRoundTrip (roundTrip :: LocalMixDatabase ID -> LocalMixDatabase ID)
