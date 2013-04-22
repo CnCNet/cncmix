@@ -1,14 +1,9 @@
+{-# OPTIONS_GHC -F -pgmF htfpp #-}
 {-# Language FlexibleInstances, OverlappingInstances, GeneralizedNewtypeDeriving #-}
 module Codec.Archive.CnCMix.TiberianDawn
        ( ID()
+       , htf_thisModulesTests
        ) where
-
-import qualified Codec.Archive.CnCMix.Backend as F
-import Codec.Archive.CnCMix.Backend
-  ( File(File)
-  , CnCID
-  , stringToID
-  )
 
 import Codec.Archive.CnCMix.LocalMixDatabase
 
@@ -29,8 +24,15 @@ import Data.Binary.Put
 
 import qualified Control.Monad as S
 
+import Test.Framework
 import Test.QuickCheck
 
+import qualified Codec.Archive.CnCMix.Backend as F
+import Codec.Archive.CnCMix.Backend
+  ( File(File)
+  , CnCID
+  , stringToID
+  )
 
 --
 -- Datatypes
@@ -225,40 +227,40 @@ instance Arbitrary Mix where
 roundTrip :: Binary a => a -> a
 roundTrip = decode . encode
 
-testRoundTrip :: (Eq a, Show a, Arbitrary a) => (a -> a) -> IO ()
-testRoundTrip = quickCheck . F.testRoundTrip
+testHelp_RoundTrip :: (Eq a, Show a, Arbitrary a) => (a -> a) -> IO ()
+testHelp_RoundTrip = quickCheck . F.testRoundTrip
 
-testTopHeader :: IO ()
-testTopHeader = testRoundTrip (roundTrip :: TopHeader -> TopHeader)
+test_TopHeader :: IO ()
+test_TopHeader = testHelp_RoundTrip (roundTrip :: TopHeader -> TopHeader)
 
-testEntryHeader :: IO ()
-testEntryHeader = testRoundTrip (roundTrip :: EntryHeader -> EntryHeader)
+test_EntryHeader :: IO ()
+test_EntryHeader = testHelp_RoundTrip (roundTrip :: EntryHeader -> EntryHeader)
 
-testMix :: IO ()
-testMix = testRoundTrip (roundTrip :: Mix -> Mix)
+test_Mix :: IO ()
+test_Mix = testHelp_RoundTrip (roundTrip :: Mix -> Mix)
 
-testAllToMix :: IO ()
-testAllToMix = quickCheck $ \fs ->
+test_AllToMix :: IO ()
+test_AllToMix = quickCheck $ \fs ->
   (fileListToMix $ Map.toList (fs :: Map ID File) , fileMapToMix fs)
 
-testAllFromMix :: IO ()
-testAllFromMix = quickCheck $ \fs ->
+test_AllFromMix :: IO ()
+test_AllFromMix = quickCheck $ \fs ->
   (Map.fromList $ mixToFileList (fs :: Mix) , mixToFileMap fs)
 
-testList :: IO ()
-testList = testRoundTrip $ fileListToMix . mixToFileList
+test_List :: IO ()
+test_List = testHelp_RoundTrip $ fileListToMix . mixToFileList
 
-testMapNoLMD :: IO ()
-testMapNoLMD = quickCheck test
+test_MapNoLMD :: IO ()
+test_MapNoLMD = quickCheck test
   where test fm = (mix, (fileMapToMix $ mixToFileMap mix))
                 -- Needs to be initially sorted for test to work
           where mix = fileMapToMix fm
 
-testNames :: IO ()
-testNames = testRoundTrip $ loadNames . saveNames
+test_Names :: IO ()
+test_Names = testHelp_RoundTrip $ loadNames . saveNames
 
-testMap :: IO ()
-testMap = testRoundTrip (roundTrip :: Map ID File -> Map ID File)
+test_Map :: IO ()
+test_Map = testHelp_RoundTrip (roundTrip :: Map ID File -> Map ID File)
 
-testLMD :: IO ()
-testLMD = testRoundTrip (roundTrip :: LocalMixDatabase ID -> LocalMixDatabase ID)
+test_LMD :: IO ()
+test_LMD = testHelp_RoundTrip (roundTrip :: LocalMixDatabase ID -> LocalMixDatabase ID)

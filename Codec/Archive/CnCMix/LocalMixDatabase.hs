@@ -1,12 +1,11 @@
+{-# OPTIONS_GHC -F -pgmF htfpp #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Codec.Archive.CnCMix.LocalMixDatabase
        ( LocalMixDatabase ( LocalMixDatabase
                           , getLMD
                           )
+       , htf_thisModulesTests
        ) where
-
-import Codec.Archive.CnCMix.Backend(CnCID,stringToID)
-import qualified Codec.Archive.CnCMix.Backend as F
 
 import qualified Data.ByteString.Lazy.Char8 as C
 
@@ -23,7 +22,11 @@ import qualified Data.Foldable as Y
 
 import qualified Control.Monad as S
 
+import Test.Framework
 import Test.QuickCheck
+
+import Codec.Archive.CnCMix.Backend(CnCID,stringToID)
+import qualified Codec.Archive.CnCMix.Backend as F
 
 
 newtype LocalMixDatabase id = LocalMixDatabase { getLMD :: Map id String }
@@ -70,17 +73,17 @@ instance CnCID id => Arbitrary (LocalMixDatabase id) where
                . map ((\str -> (F.stringToID str, str)) . filter (/= '\NUL')))
               arbitrary
 
-testPutStr :: IO ()
-testPutStr = quickCheck test
+test_PutStr :: IO ()
+test_PutStr = quickCheck test
   where test str = (fromIntegral $ length str + 1) == (C.length $ runPut $ putAsCString str)
 
-testStringRoundTrip :: IO ()
-testStringRoundTrip = quickCheck test
+test_StringRoundTrip :: IO ()
+test_StringRoundTrip = quickCheck test
   where test str = (safe, C.unpack $ runGet getLazyByteStringNul $ runPut $ putAsCString safe)
           where safe = filter (/= '\NUL') str
 
-testStringsRoundTrip :: IO ()
-testStringsRoundTrip = quickCheck test
+test_StringsRoundTrip :: IO ()
+test_StringsRoundTrip = quickCheck test
   where test strs = (safes',safes)
           where safes' :: [String]
                 safes' = runGet (S.replicateM len $ S.liftM C.unpack getLazyByteStringNul) bytes
