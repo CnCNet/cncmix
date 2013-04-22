@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -F -pgmF htfpp #-}
-module TestMain where
+module Main where
 
 -- The main test program.
 

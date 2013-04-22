@@ -10,7 +10,7 @@ category:            Codec
 build-type:          Simple
 cabal-version:       >=1.10
 
-flag executable
+flag tool
   Description:       Build the command line tool in addition to the library.
   Default:           False
 
@@ -23,7 +23,7 @@ library
   default-language:  Haskell2010
 
 executable cncmix
-  if flag(executable)
+  if flag(tool)
     Buildable:       True
   else
     Buildable:       False
@@ -33,7 +33,7 @@ executable cncmix
 
 test-suite test-cncmix
   type:              exitcode-stdio-1.0
-  main-is:           TestMain.hs
+  main-is:           Test.hs
   other-modules:     Codec.Archive.CnCMix, Codec.Archive.CnCMix.Backend, Codec.Archive.CnCMix.LocalMixDatabase,
                      Codec.Archive.CnCMix.TiberianDawn,
                      Codec.Archive.CnCMix.RedAlert.Normal
