@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
 module Main(main) where
 
 import qualified Codec.Archive.CnCMix as F
@@ -202,23 +202,25 @@ instance RecordCommand Basic where
        L.hPut (snd tmpF) =<<
          if validImputMixExists
          then do CnCMix old <- decodeFile mIn
-                 addMap <- F.readMany =<< getDirContentsRecursive aFs
+                 addMap <- F.readMany =<< getAllWithin aFs
                  let remover :: CnCID id => FilePath -> Map id File -> Map id File
                      remover f m = Map.delete (F.stringToID f) m
                  return $ encode $ foldr remover (Map.union addMap old) rFs
          else do CnCMix dummy <- return $ F.manualConstraint $ toEnum mType
-                 return . encode . Map.union dummy =<< F.readMany =<< getDirContentsRecursive aFs
+                 return . encode . Map.union dummy =<< F.readMany =<< getAllWithin aFs
 
        -- close and (maybe) rename
        hClose $ snd tmpF
        when willMutateMix $ renameFile (fst tmpF) mOut
 
-
-getDirContentsRecursive :: CnCID id => [FilePath] -> IO (Map id FilePath)
-getDirContentsRecursive = foldr helper $ return Map.empty
+getAllWithin :: CnCID id => [FilePath] -> IO (Map id FilePath)
+getAllWithin = foldr helper $ return Map.empty
   where helper :: CnCID id => FilePath -> IO (Map id FilePath) -> IO (Map id FilePath)
-        helper path map =
+        helper "."  oldMap = oldMap -- don't want to reccur forever with this
+        helper ".." oldMap = oldMap -- or this
+        helper path oldMap =
           doesDirectoryExist path >>= \x ->
             if x
-            then liftM2 Map.union (getDirContentsRecursive =<< getDirectoryContents path) map
-            else liftM (Map.insert (F.stringToID path) path) map
+            then liftM2 Map.union (liftM (Map.map (path </>)) filesWithin) oldMap -- subdirectory
+            else liftM (Map.insert (F.stringToID path) path) oldMap               -- single file
+          where filesWithin = getAllWithin =<< getDirectoryContents path
