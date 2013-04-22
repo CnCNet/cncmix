@@ -15,10 +15,11 @@ flag executable
   Default:           False
 
 library
-  exposed-modules:   Main, Codec.Archive.CnCMix, Codec.Archive.CnCMix.Backend, Codec.Archive.CnCMix.LocalMixDatabase,
+  exposed-modules:   Codec.Archive.CnCMix, Codec.Archive.CnCMix.Backend, Codec.Archive.CnCMix.LocalMixDatabase,
                      Codec.Archive.CnCMix.TiberianDawn,
-                     Codec.Archive.CnCMix.RedAlert.Normal, Codec.Archive.CnCMix.RedAlert.Checksummed, Codec.Archive.CnCMix.RedAlert.Encrypted
-  build-depends:     base ==4.5.*, containers ==0.4.*, filepath ==1.3.*, directory ==1.1.*, cmdlib ==0.3.*, bytestring ==0.9.*, binary ==0.5.*, QuickCheck ==2.4.*, HTF == 0.10.*
+                     Codec.Archive.CnCMix.RedAlert.Normal
+                     -- , Codec.Archive.CnCMix.RedAlert.Checksummed, Codec.Archive.CnCMix.RedAlert.Encrypted
+  build-depends:     base ==4.5.*, containers ==0.4.*, filepath ==1.3.*, directory ==1.1.*, bytestring ==0.9.*, binary ==0.5.*, QuickCheck ==2.4.*, HTF == 0.10.*
   default-language:  Haskell2010
 
 executable cncmix
@@ -27,14 +28,15 @@ executable cncmix
   else
     Buildable:       False
   main-is:           Main.hs
-  build-depends:     base ==4.5.*, containers ==0.4.*, filepath ==1.3.*, directory ==1.1.*, cmdlib ==0.3.*, bytestring ==0.9.*, binary ==0.5.*, QuickCheck ==2.4.*, HTF == 0.10.*
+  build-depends:     cncmix, base ==4.5.*, containers ==0.4.*, filepath ==1.3.*, directory ==1.1.*, cmdlib ==0.3.*, bytestring ==0.9.*, binary ==0.5.*, QuickCheck ==2.4.*, HTF == 0.10.*
   default-language:  Haskell2010
 
-test-suite sample-tests
+test-suite test-cncmix
   type:              exitcode-stdio-1.0
   main-is:           TestMain.hs
-  other-modules:     Main, Codec.Archive.CnCMix, Codec.Archive.CnCMix.Backend, Codec.Archive.CnCMix.LocalMixDatabase,
+  other-modules:     Codec.Archive.CnCMix, Codec.Archive.CnCMix.Backend, Codec.Archive.CnCMix.LocalMixDatabase,
                      Codec.Archive.CnCMix.TiberianDawn,
-                     Codec.Archive.CnCMix.RedAlert.Normal, Codec.Archive.CnCMix.RedAlert.Checksummed, Codec.Archive.CnCMix.RedAlert.Encrypted
+                     Codec.Archive.CnCMix.RedAlert.Normal
+                      -- , Codec.Archive.CnCMix.RedAlert.Checksummed, Codec.Archive.CnCMix.RedAlert.Encrypted
   build-depends:     base ==4.5.*, containers ==0.4.*, filepath ==1.3.*, directory ==1.1.*, cmdlib ==0.3.*, bytestring ==0.9.*, binary ==0.5.*, QuickCheck ==2.4.*, HTF == 0.10.*
   default-language:  Haskell2010
