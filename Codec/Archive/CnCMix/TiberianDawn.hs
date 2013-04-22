@@ -227,40 +227,33 @@ instance Arbitrary Mix where
 roundTrip :: Binary a => a -> a
 roundTrip = decode . encode
 
-testHelp_RoundTrip :: (Eq a, Show a, Arbitrary a) => (a -> a) -> IO ()
-testHelp_RoundTrip = quickCheck . F.testRoundTrip
+prop_TopHeader :: Property
+prop_TopHeader = F.testRoundTrip (roundTrip :: TopHeader -> TopHeader)
 
-test_TopHeader :: IO ()
-test_TopHeader = testHelp_RoundTrip (roundTrip :: TopHeader -> TopHeader)
+prop_EntryHeader :: Property
+prop_EntryHeader = F.testRoundTrip (roundTrip :: EntryHeader -> EntryHeader)
 
-test_EntryHeader :: IO ()
-test_EntryHeader = testHelp_RoundTrip (roundTrip :: EntryHeader -> EntryHeader)
+prop_Mix :: Property
+prop_Mix = F.testRoundTrip (roundTrip :: Mix -> Mix)
 
-test_Mix :: IO ()
-test_Mix = testHelp_RoundTrip (roundTrip :: Mix -> Mix)
+prop_AllToMix :: Map ID File -> (Mix, Mix)
+prop_AllToMix fs = (fileListToMix $ Map.toList (fs :: Map ID File) , fileMapToMix fs)
 
-test_AllToMix :: IO ()
-test_AllToMix = quickCheck $ \fs ->
-  (fileListToMix $ Map.toList (fs :: Map ID File) , fileMapToMix fs)
+prop_AllFromMix :: Mix -> (Map ID File, Map ID File)
+prop_AllFromMix fs = (Map.fromList $ mixToFileList (fs :: Mix) , mixToFileMap fs)
 
-test_AllFromMix :: IO ()
-test_AllFromMix = quickCheck $ \fs ->
-  (Map.fromList $ mixToFileList (fs :: Mix) , mixToFileMap fs)
+prop_List :: Property
+prop_List = F.testRoundTrip $ fileListToMix . mixToFileList
 
-test_List :: IO ()
-test_List = testHelp_RoundTrip $ fileListToMix . mixToFileList
+prop_MapNoLMD :: Map ID File -> (Mix, Mix)
+prop_MapNoLMD fm = (mix, (fileMapToMix $ mixToFileMap mix))
+  where mix = fileMapToMix fm -- Needs to be initially sorted for test to work
 
-test_MapNoLMD :: IO ()
-test_MapNoLMD = quickCheck test
-  where test fm = (mix, (fileMapToMix $ mixToFileMap mix))
-                -- Needs to be initially sorted for test to work
-          where mix = fileMapToMix fm
+prop_Names :: Property
+prop_Names = F.testRoundTrip $ loadNames . saveNames
 
-test_Names :: IO ()
-test_Names = testHelp_RoundTrip $ loadNames . saveNames
+prop_Map :: Property
+prop_Map = F.testRoundTrip (roundTrip :: Map ID File -> Map ID File)
 
-test_Map :: IO ()
-test_Map = testHelp_RoundTrip (roundTrip :: Map ID File -> Map ID File)
-
-test_LMD :: IO ()
-test_LMD = testHelp_RoundTrip (roundTrip :: LocalMixDatabase ID -> LocalMixDatabase ID)
+prop_LMD :: Property
+prop_LMD = F.testRoundTrip (roundTrip :: LocalMixDatabase ID -> LocalMixDatabase ID)

@@ -73,21 +73,18 @@ instance CnCID id => Arbitrary (LocalMixDatabase id) where
                . map ((\str -> (F.stringToID str, str)) . filter (/= '\NUL')))
               arbitrary
 
-test_PutStr :: IO ()
-test_PutStr = quickCheck test
-  where test str = (fromIntegral $ length str + 1) == (C.length $ runPut $ putAsCString str)
+prop_StrPreserveLength :: [Char] -> Bool
+prop_StrPreserveLength str = (fromIntegral $ length str + 1) == (C.length $ runPut $ putAsCString str)
 
-test_StringRoundTrip :: IO ()
-test_StringRoundTrip = quickCheck test
-  where test str = (safe, C.unpack $ runGet getLazyByteStringNul $ runPut $ putAsCString safe)
-          where safe = filter (/= '\NUL') str
+prop_StrRoundTrip :: String -> (String, String)
+prop_StrRoundTrip str = (safe, C.unpack $ runGet getLazyByteStringNul $ runPut $ putAsCString safe)
+  where safe = filter (/= '\NUL') str
 
-test_StringsRoundTrip :: IO ()
-test_StringsRoundTrip = quickCheck test
-  where test strs = (safes',safes)
-          where safes' :: [String]
-                safes' = runGet (S.replicateM len $ S.liftM C.unpack getLazyByteStringNul) bytes
-                bytes :: C.ByteString
-                bytes = runPut $ S.mapM_ putAsCString safes
-                len = length strs
-                safes = map (filter (/= '\NUL')) strs
+prop_LMDRoundTrip :: [String] -> ([String], [String])
+prop_LMDRoundTrip strs = (safes',safes)
+  where safes' :: [String]
+        safes' = runGet (S.replicateM len $ S.liftM C.unpack getLazyByteStringNul) bytes
+        bytes :: C.ByteString
+        bytes = runPut $ S.mapM_ putAsCString safes
+        len = length strs
+        safes = map (filter (/= '\NUL')) strs
